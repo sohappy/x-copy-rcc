@@ -16,6 +16,7 @@
   <img alt="Matériel" src="https://img.shields.io/badge/mat%C3%A9riel-Greaseweazle-green">
   <img alt="Amiga" src="https://img.shields.io/badge/Amiga-DD%20880K%20%7C%20HD%201.76M-red">
   <img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-blue">
+  <a href="https://github.com/sohappy/x-copy-rcc/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sohappy/x-copy-rcc/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 <p align="center">
@@ -27,11 +28,12 @@
 ## Sommaire
 
 - [Fonctions](#fonctions)
+- [Télécharger](#télécharger)
 - [Installation](#installation)
 - [Premiers pas](#premiers-pas)
 - [Utilisation](#utilisation)
 - [Dépannage](#dépannage)
-- [Compilation et tests](#compilation-et-tests)
+- [Compiler depuis les sources](#compiler-depuis-les-sources)
 - [Organisation du code](#organisation-du-code)
 - [Crédits](#crédits)
 - [Licence](#licence)
@@ -92,6 +94,23 @@
 - **Journal complet** des commandes `gw` : cliquez sur la ligne d'état en bas.
 - **Mélodies rétro** de fin, d'abandon et d'erreur, désactivables dans SETUP.
 - Réglages mémorisés entre deux sessions.
+
+## Télécharger
+
+Les exécutables prêts à l'emploi sont sur la page
+**[Releases](https://github.com/sohappy/x-copy-rcc/releases)** :
+
+| Système | Fichier | Lancement |
+|---|---|---|
+| Windows 10/11 (x64) | `X-COPY-Modern-…-windows-x86_64.zip` | Dézippez et lancez `X-COPY-Modern.exe`. |
+| macOS 11+ (Apple Silicon et Intel) | `X-COPY-Modern-…-macos-universal.zip` | Dézippez et glissez **X-COPY Modern.app** dans Applications. L'application n'est pas signée : au premier lancement, **clic droit → Ouvrir**. |
+| Linux x86_64 | `X-COPY-Modern-…-linux-x86_64.tar.gz` | Décompressez puis lancez `./install.sh` (installation pour l'utilisateur, avec entrée de menu et icône). |
+
+Si macOS refuse toujours d'ouvrir l'application (« endommagée ») :
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/X-COPY Modern.app"
+```
 
 ## Installation
 
@@ -202,17 +221,99 @@ Face **haute** = tête 1, face **basse** = tête 0 (convention Amiga).
 Quelques `R` : fatiguée. Des cases rouges : HS sur ces pistes. Testez d'abord une disquette connue
 comme bonne, pour mettre le lecteur hors de cause.
 
-## Compilation et tests
+## Compiler depuis les sources
 
-Prérequis : **Rust 1.95 ou plus récent** (`rustup update`).
+Il faut **Rust 1.95 ou plus récent**, installé avec [rustup](https://rustup.rs). Un Rust déjà
+installé se met à jour avec `rustup update`.
+
+### Windows
+
+1. Installez les **Visual Studio Build Tools** avec la charge de travail
+   « Développement Desktop en C++ » (l'installeur de rustup le propose).
+2. Installez Rust : téléchargez et lancez `rustup-init.exe` depuis [rustup.rs](https://rustup.rs).
+3. Dans PowerShell :
+
+```powershell
+git clone https://github.com/sohappy/x-copy-rcc.git
+cd x-copy-rcc
+cargo build --release -p xcopy-modern
+.\target\release\xcopy-modern.exe
+```
+
+L'icône est intégrée à l'exécutable par `build.rs`.
+
+### macOS
 
 ```bash
-cargo test --workspace
+xcode-select --install                                           # outils Apple (une fois)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust (une fois)
+git clone https://github.com/sohappy/x-copy-rcc.git
+cd x-copy-rcc
 cargo build --release -p xcopy-modern
 ./target/release/xcopy-modern
 ```
 
-Sous Windows, l'icône est intégrée à l'exécutable par `build.rs`.
+Pour obtenir une application **X-COPY Modern.app** avec son icône (dans `dist/`) :
+
+```bash
+bash packaging/package.sh macos
+```
+
+Version universelle (Apple Silicon + Intel) :
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+cargo build --release -p xcopy-modern --target aarch64-apple-darwin
+cargo build --release -p xcopy-modern --target x86_64-apple-darwin
+mkdir -p target/universal
+lipo -create -output target/universal/xcopy-modern \
+  target/aarch64-apple-darwin/release/xcopy-modern target/x86_64-apple-darwin/release/xcopy-modern
+bash packaging/package.sh macos-universal
+```
+
+### Linux
+
+Bibliothèques système nécessaires à l'interface graphique (Debian / Ubuntu) :
+
+```bash
+sudo apt install build-essential pkg-config libxkbcommon-dev libgl1-mesa-dev libwayland-dev \
+  libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+git clone https://github.com/sohappy/x-copy-rcc.git
+cd x-copy-rcc
+cargo build --release -p xcopy-modern
+./target/release/xcopy-modern
+```
+
+Fedora : `sudo dnf install gcc pkgconf libxkbcommon-devel mesa-libGL-devel wayland-devel libxcb-devel`.
+
+Pour installer le programme avec une entrée de menu et son icône :
+
+```bash
+bash packaging/package.sh linux-x86_64
+tar xzf dist/X-COPY-Modern-dev-linux-x86_64.tar.gz
+./X-COPY-Modern-dev-linux-x86_64/install.sh
+```
+
+### Tests
+
+```bash
+cargo test --workspace
+```
+
+### Compilation automatique (GitHub Actions)
+
+* **`ci.yml`** : à chaque push, compile et teste sur Linux, Windows et macOS.
+* **`release.yml`** : à chaque tag `v…`, compile les trois versions (Windows `.zip`, macOS `.app`
+  universelle, Linux `.tar.gz`) et publie une release GitHub :
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Depuis l'onglet **Actions → Release → Run workflow**, les trois versions sont compilées et
+téléchargeables comme artefacts, sans publier de release.
 
 ### Essai sans matériel
 
@@ -245,8 +346,9 @@ crates/
     ├── font.rs      Police bitmap 8 × 8 rendue en texture, avec dégradé et ombre
     ├── sound.rs     Mélodies carrées synthétisées en WAV, jouées par le lecteur du système
     └── settings.rs  Options mémorisées
-packaging/           Icônes (PNG 16 à 512 px, .ico)
+packaging/           Icônes (PNG 16 à 512 px, .ico, .icns), package.sh, bundle macOS, installation Linux
 tools/fake-gw.py     Simulateur de gw pour les tests
+.github/workflows/   ci.yml (tests 3 systèmes), release.yml (exécutables et release)
 ```
 
 ## Crédits

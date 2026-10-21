@@ -1,0 +1,13 @@
+[workspace]
+members = ["crates/hgf-core", "crates/xcopy"]
+resolver = "2"
+
+[workspace.package]
+version = "0.17.1"
+edition = "2021"
+rust-version = "1.95"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
