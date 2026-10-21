@@ -2,7 +2,7 @@
   <img src="packaging/icon-128.png" width="128" alt="Icône X-COPY Modern">
 </p>
 
-<h1 align="center">X-COPY Modern</h1>
+<h1 align="center">X-COPY Modernized version for Amiga by the Retro Computing Club (Adour) </h1>
 
 <p align="center">
   <b>Retro Computing Club · RCC(A) Edition 1.0</b><br>
