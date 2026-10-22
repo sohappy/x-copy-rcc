@@ -94,7 +94,8 @@
 - **Live track maps** for the upper and lower sides; hovering a cell shows its sectors.
 - **Plain-language explanations** of `gw` errors (No Index, verify failure…).
 - **Full log** of the `gw` commands: click the status line at the bottom.
-- **Retro jingles** on completion, abort and error; can be turned off in SETUP.
+- **X-COPY sounds**: the "Boing" sample when an operation completes, the error "Boing" when it fails
+  (a short jingle when you stop it); can be turned off in SETUP.
 - Settings are remembered between sessions.
 
 ## Download
@@ -351,7 +352,7 @@ crates/
     │   └── screen.rs  drawing of the screen and requesters
     ├── engine.rs    Step queue (gw, confirmation, disk swap, checks), testable with a scripted Spawner
     ├── ui/          Retro rendering: font.rs (8 × 8 bitmap font), gfx.rs (scaled screen, panels, lamps, logo)
-    ├── sound.rs     Square-wave jingles synthesised as WAV, played by the system player
+    ├── sound.rs     End sounds (X-COPY samples, synthesised abort jingle), played by the system player
     └── settings.rs  Saved options
 packaging/           Icons (PNG 16 to 512 px, .ico, .icns), package.sh, macOS bundle, Linux install
 tools/fake-gw.py     gw simulator for testing
@@ -377,9 +378,10 @@ Closed sets of cases (gw actions, engine steps, track states) are Rust `enum`s w
 - **[font8x8](https://crates.io/crates/font8x8)**: 8 × 8 bitmap glyphs (public domain).
 - **[rfd](https://crates.io/crates/rfd)**: native file dialogs.
 
-The interface pays tribute to **X-COPY Professional**, the 1990s Amiga disk copier. The logo,
-graphics and sounds are original creations. The original logo, its authors' credits, the mascot
-and the Amiga logo are not reproduced. X-COPY and Amiga are trademarks of their respective owners.
+The interface pays tribute to **X-COPY Professional**, the 1990s Amiga disk copier. The logo and
+graphics are original creations; the original logo, its authors' credits, the mascot and the Amiga
+logo are not reproduced. The two "Boing" sounds in `crates/xcopy/assets/sounds/` come from X-COPY
+and remain the property of their authors: they are not covered by this project's GPL license. X-COPY and Amiga are trademarks of their respective owners.
 This project is affiliated neither with them nor with the Greaseweazle project.
 
 ## License

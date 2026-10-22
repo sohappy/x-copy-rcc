@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Retro Computing Club (RCC)
 
-//! Retro jingles (square waves, synthesised here) played with the system's own player:
-//! `afplay` on macOS, the .NET SoundPlayer on Windows, `paplay`/`aplay` on Linux.
-//! No audio library is linked, so nothing extra is needed to build.
+//! End-of-operation sounds, played with the system's own player: `afplay` on macOS, the .NET
+//! SoundPlayer on Windows, `paplay`/`aplay` on Linux. No audio library is linked.
+//!
+//! * copy done and error: the X-COPY "Boing" samples (`assets/sounds/*.wav`, embedded in the
+//!   executable);
+//! * abort: a short square-wave jingle synthesised here.
 
 use std::path::PathBuf;
 
@@ -29,7 +32,22 @@ fn notes(s: Sound) -> &'static [(f32, u32)] {
 }
 
 /// 8-bit mono WAV of the jingle.
+/// X-COPY sample played when an operation completes.
+const DONE_WAV: &[u8] = include_bytes!("../assets/sounds/done.wav");
+/// X-COPY sample played when an operation fails.
+const ERROR_WAV: &[u8] = include_bytes!("../assets/sounds/error.wav");
+
+/// WAV file of a sound: the X-COPY samples for done/error, a synthesised jingle otherwise.
 pub fn wav(s: Sound) -> Vec<u8> {
+    match s {
+        Sound::Done => DONE_WAV.to_vec(),
+        Sound::Error => ERROR_WAV.to_vec(),
+        Sound::Abort => synth(s),
+    }
+}
+
+/// 8-bit mono WAV of a square-wave jingle.
+fn synth(s: Sound) -> Vec<u8> {
     let mut pcm: Vec<u8> = Vec::new();
     for &(f, ms) in notes(s) {
         let n = (RATE * ms / 1000) as usize;
@@ -121,9 +139,19 @@ mod tests {
 
     #[test]
     fn wav_header_is_consistent() {
-        let w = wav(Sound::Done);
+        let w = synth(Sound::Abort);
         assert_eq!(&w[..4], b"RIFF");
         assert_eq!(u32::from_le_bytes([w[4], w[5], w[6], w[7]]) as usize, w.len() - 8);
         assert_eq!(u32::from_le_bytes([w[40], w[41], w[42], w[43]]) as usize, w.len() - 44);
+    }
+
+    #[test]
+    fn embedded_samples_are_pcm_wav() {
+        for s in [Sound::Done, Sound::Error] {
+            let w = wav(s);
+            assert_eq!(&w[..4], b"RIFF");
+            assert_eq!(&w[8..12], b"WAVE");
+            assert_eq!(u16::from_le_bytes([w[20], w[21]]), 1, "PCM, playable by every system player");
+        }
     }
 }

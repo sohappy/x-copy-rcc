@@ -94,7 +94,8 @@
 - **Grilles de pistes en direct**, face haute et face basse ; le survol d'une case détaille ses secteurs.
 - **Explication en clair des erreurs** de `gw` (No Index, échec de vérification…).
 - **Journal complet** des commandes `gw` : cliquez sur la ligne d'état en bas.
-- **Mélodies rétro** de fin, d'abandon et d'erreur, désactivables dans SETUP.
+- **Sons d'X-COPY** : le « Boing » en fin d'opération, le « Boing » d'erreur en cas d'échec (une courte
+  mélodie quand vous arrêtez) ; désactivables dans SETUP.
 - Réglages mémorisés entre deux sessions.
 
 ## Télécharger
@@ -352,7 +353,7 @@ crates/
     │   └── screen.rs  dessin de l'écran et des requêteurs
     ├── engine.rs    File d'étapes (gw, confirmation, échange de disque, contrôles), testable avec un Spawner scripté
     ├── ui/          Rendu rétro : font.rs (police 8 × 8), gfx.rs (écran mis à l'échelle, panneaux, lampes, logo)
-    ├── sound.rs     Mélodies carrées synthétisées en WAV, jouées par le lecteur du système
+    ├── sound.rs     Sons de fin (échantillons X-COPY, mélodie d'abandon synthétisée), joués par le lecteur du système
     └── settings.rs  Options mémorisées
 packaging/           Icônes (PNG 16 à 512 px, .ico, .icns), package.sh, bundle macOS, installation Linux
 tools/fake-gw.py     Simulateur de gw pour les tests
@@ -379,9 +380,11 @@ Les ensembles fermés de cas (actions gw, étapes du moteur, états de piste) so
 - **[font8x8](https://crates.io/crates/font8x8)** : glyphes bitmap 8 × 8 (domaine public).
 - **[rfd](https://crates.io/crates/rfd)** : sélecteurs de fichiers natifs.
 
-L'interface rend hommage à **X-COPY Professional**, le copieur Amiga des années 90. Le logo, les
-graphismes et les sons sont des créations originales. Le logo d'origine, les crédits de ses
-auteurs, la mascotte et le logo Amiga ne sont pas reproduits. X-COPY et Amiga sont des marques de
+L'interface rend hommage à **X-COPY Professional**, le copieur Amiga des années 90. Le logo et les
+graphismes sont des créations originales ; le logo d'origine, les crédits de ses auteurs, la mascotte
+et le logo Amiga ne sont pas reproduits. Les deux sons « Boing » de `crates/xcopy/assets/sounds/`
+viennent d'X-COPY et restent la propriété de leurs auteurs : ils ne sont pas couverts par la licence
+GPL de ce projet. X-COPY et Amiga sont des marques de
 leurs propriétaires respectifs. Ce projet n'est affilié ni à eux ni au projet Greaseweazle.
 
 ## Licence
