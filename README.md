@@ -2,7 +2,7 @@
   <img src="packaging/icon-128.png" width="128" alt="X-COPY Modern icon">
 </p>
 
-<h1 align="center">X-COPY Modern</h1>
+<h1 align="center">X-COPY Modernized version for Amiga by the Retro Computing Club (Adour) </h1>
 
 <p align="center">🇬🇧 <b>English</b> · 🇫🇷 <a href="README.fr.md">Français</a></p>
 
