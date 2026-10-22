@@ -1,19 +1,21 @@
 [package]
 name = "hgf-core"
-license = "GPL-3.0-or-later"
-description = "Greaseweazle command model, process runner and output parser for HappyGreaseFloppy"
-version = "0.17.1"
+description = "Greaseweazle command model, process runner, output parser and floppy filesystems"
+version = "0.18.0"
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
 [dependencies]
-regex = "1"
-serde = { version = "1", features = ["derive"] }
-sha2 = "0.10"
-hex = "0.4"
+regex.workspace = true
+serde.workspace = true
+sha2.workspace = true
+hex.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [dev-dependencies]
-serde_json = "1"
+serde_json.workspace = true

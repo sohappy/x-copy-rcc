@@ -5,13 +5,11 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod amiga;
 mod app;
 mod engine;
-mod font;
-mod gfx;
 mod settings;
 mod sound;
+mod ui;
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {

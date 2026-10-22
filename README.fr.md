@@ -335,23 +335,41 @@ FAKE_VERIFY_FAIL=1 XCOPY_GW=$PWD/tools/fake-gw.py ./target/release/xcopy-modern
 ## Organisation du code
 
 ```
+Cargo.toml           Workspace : chaque dépendance déclarée une seule fois ([workspace.dependencies])
 crates/
-├── hgf-core/        Moteur Greaseweazle (sans interface, testé)
-│                    commandes gw, exécution avec annulation, analyse de la sortie,
-│                    carte des pistes, images AmigaDOS vierges, explorateur ADF, aides
+├── hgf-core/        Cœur Greaseweazle et disquettes (sans interface, testé)
+│   ├── gw/          Dialogue avec gw : commandes (Action), runner, trait Spawner, analyse de la sortie, détection, ports
+│   ├── disk/        Sélections de pistes, carte en direct, formats et préréglages, fichiers image, noms
+│   ├── fs/          Systèmes de fichiers : trait BlankDisk, octets, FAT12, CBM DOS, Acorn DFS, Apple II
+│   │   └── amigados/  checksums et géométrie, format (disques vierges), explore (explorateur ADF), analyse (bitmap, boot block)
+│   └── diag/        Santé du lecteur, aides en clair, compatibilité d'écriture Amiga
 └── xcopy/src/
     ├── main.rs      Fenêtre (eframe/egui), icône
-    ├── app.rs       Écran X-COPY : disposition, clics, requêteurs, construction des opérations
-    ├── engine.rs    File d'étapes (gw, confirmation, échange de disque, contrôles) sans bloquer l'interface
-    ├── amiga.rs     Analyse AmigaDOS : bitmap (BAMCOPY), nom du volume, boot block
-    ├── gfx.rs       Écran virtuel 1280 × 720 mis à l'échelle, panneaux rivetés, lampes, disquettes, logo
-    ├── font.rs      Police bitmap 8 × 8 rendue en texture, avec dégradé et ombre
+    ├── app/         L'application X-COPY
+    │   ├── mod.rs     état, répartition des clics, boucle eframe
+    │   ├── ops.rs     opérations lancées par les boutons (copie, formatage…) sous forme de listes d'étapes
+    │   ├── dialogs.rs sélecteurs de fichiers (non bloquants) et requêteurs
+    │   └── screen.rs  dessin de l'écran et des requêteurs
+    ├── engine.rs    File d'étapes (gw, confirmation, échange de disque, contrôles), testable avec un Spawner scripté
+    ├── ui/          Rendu rétro : font.rs (police 8 × 8), gfx.rs (écran mis à l'échelle, panneaux, lampes, logo)
     ├── sound.rs     Mélodies carrées synthétisées en WAV, jouées par le lecteur du système
     └── settings.rs  Options mémorisées
 packaging/           Icônes (PNG 16 à 512 px, .ico, .icns), package.sh, bundle macOS, installation Linux
 tools/fake-gw.py     Simulateur de gw pour les tests
-.github/workflows/   ci.yml (tests 3 systèmes), release.yml (exécutables et release)
+.github/workflows/   ci.yml (fmt + clippy, tests sur 3 systèmes), release.yml (exécutables et release)
 ```
+
+Deux traits portent les abstractions réellement partagées :
+
+* **`fs::BlankDisk`** : chaque formateur (AmigaDOS, FAT12, CBM, DFS, Apple II) valide sa saisie,
+  donne son format `gw` et son extension, et construit son image par la même interface.
+* **`gw::spawn::Spawner` / `JobControl`** : le moteur lance `gw` par cette interface ;
+  `ProcessSpawner` exécute le vrai programme, `ScriptedSpawner` rejoue une sortie enregistrée. La
+  logique de copie (confirmation, lecture, pistes illisibles, écriture, échecs, arrêt) est ainsi
+  testée sans matériel.
+
+Les ensembles fermés de cas (actions gw, étapes du moteur, états de piste) sont des `enum` Rust avec
+`match` exhaustif : ajouter un cas ne compile pas tant que tous les endroits ne le gèrent pas.
 
 ## Crédits
 

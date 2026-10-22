@@ -1,40 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Core of HappyGreaseFloppy.
+//! Greaseweazle and floppy-disk core, without any GUI dependency.
 //!
-//! This crate has no GUI dependency. It knows how to:
-//! * describe every Greaseweazle `gw` action and turn it into command-line arguments ([`gw`]);
-//! * validate user input before touching a disk ([`gw::Action::validate`]);
-//! * run `gw` in the background with live output and cancellation ([`runner`]);
-//! * understand `gw` output ([`parse`]) and turn it into a per-track disk map ([`diskmap`]);
-//! * list disk formats and image types ([`formats`]);
-//! * inspect image files, including a read-only AmigaDOS explorer ([`image`]).
+//! | Module | Role |
+//! |---|---|
+//! | [`gw`] | `gw` commands and their arguments, running jobs (behind the [`gw::spawn::Spawner`] trait), parsing their output, finding `gw` |
+//! | [`disk`] | Track selections, live disk map, formats and presets, image files, file naming |
+//! | [`fs`] | Filesystems: blank disks for every machine (the [`fs::BlankDisk`] trait), AmigaDOS explorer and analysis |
+//! | [`diag`] | Drive health, plain-language hints, Amiga write compatibility |
 
-pub mod acorndfs;
-pub mod amigados;
-pub mod apple2;
-pub mod cbmdos;
-pub mod compat;
-pub mod diskmap;
-pub mod fat12;
-pub mod formats;
+pub mod diag;
+pub mod disk;
+pub mod fs;
 pub mod gw;
-pub mod health;
-pub mod hints;
-pub mod image;
-pub mod imageopts;
-pub mod locate;
-pub mod naming;
-pub mod parse;
-pub mod ports;
-pub mod runner;
-pub mod trackset;
 
-pub use diskmap::{DiskMap, MapMode, TrackInfo, TrackState};
+// The most used types, at the crate root.
+pub use disk::diskmap::{DiskMap, MapMode, TrackInfo, TrackState};
+pub use disk::trackset::TrackSet;
+pub use gw::parse::{Output, OutputParser};
+pub use gw::runner::{Job, JobEvent};
 pub use gw::{Action, ActionKind, Drive, GwConfig};
-pub use parse::{Output, OutputParser};
-pub use runner::{Job, JobEvent};
-pub use trackset::TrackSet;
 
 /// Crate version, shown in the GUI title bar.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

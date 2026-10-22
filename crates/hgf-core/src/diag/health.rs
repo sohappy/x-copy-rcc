@@ -6,7 +6,7 @@
 //! reads, write + read-back of a scratch disk); this module only turns their results into
 //! findings, so the logic is unit-tested with real captures.
 
-use crate::diskmap::DiskMap;
+use crate::disk::diskmap::DiskMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -355,9 +355,9 @@ pub fn verdict(r: &Results) -> Verdict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diskmap::MapMode;
-    use crate::parse::OutputParser;
-    use crate::trackset::TrackSet;
+    use crate::disk::diskmap::MapMode;
+    use crate::disk::trackset::TrackSet;
+    use crate::gw::parse::OutputParser;
 
     fn replay(log: &str) -> ScanStats {
         let mut map = DiskMap::new(MapMode::Read, TrackSet::dense(80, 2));
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn real_worn_disk_is_marginal_side_1() {
         // Capture from a real drive: 1745/1760 sectors, errors clustered on side 1.
-        let s = replay(include_str!("../tests/fixtures/real_scan_worn.log"));
+        let s = replay(include_str!("../../tests/fixtures/real_scan_worn.log"));
         assert_eq!((s.good, s.total), (1745, 1760));
         let (f, pattern) = reference(&s);
         assert_eq!(f.status, Status::Pass);
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn real_erased_disk_decodes_nothing() {
         // Capture from a real drive: disk erased by gw, only track 0 partly written.
-        let s = replay(include_str!("../tests/fixtures/real_scan_erased.log"));
+        let s = replay(include_str!("../../tests/fixtures/real_scan_erased.log"));
         assert_eq!(s.good, 18);
         let (_, pattern) = reference(&s);
         assert_eq!(pattern, ScanPattern::NothingDecoded);

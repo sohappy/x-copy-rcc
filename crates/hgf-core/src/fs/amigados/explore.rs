@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Image file inspection: size, checksum, guessed format and a read-only AmigaDOS explorer.
+//! Read-only AmigaDOS explorer: boot block, root block and root directory of an ADF.
 
-use crate::formats;
-use sha2::{Digest, Sha256};
-use std::path::Path;
+use super::{bcpl_name, boot_checksum_ok, header_checksum_ok};
+use crate::fs::bytes::be32;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AdfEntry {
@@ -27,37 +26,6 @@ pub struct AdfInfo {
     pub entries: Vec<AdfEntry>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ImageReport {
-    pub file_name: String,
-    pub size: u64,
-    pub extension: String,
-    pub sha256: String,
-    pub guessed_format: Option<&'static str>,
-    pub is_flux: bool,
-    pub adf: Option<Result<AdfInfo, String>>,
-}
-
-/// Inspect any image file.
-pub fn inspect(path: &Path) -> Result<ImageReport, String> {
-    let data = std::fs::read(path).map_err(|e| format!("Cannot read {}: {e}", path.display()))?;
-    let extension = formats::extension(path).unwrap_or_default();
-    let adf = (extension == "adf").then(|| inspect_adf(&data));
-    Ok(ImageReport {
-        file_name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-        size: data.len() as u64,
-        guessed_format: formats::guess_format(path, data.len() as u64),
-        is_flux: formats::FLUX_SUFFIXES.contains(&extension.as_str()),
-        extension,
-        sha256: hex::encode(Sha256::digest(&data)),
-        adf,
-    })
-}
-
-fn be32(b: &[u8], off: usize) -> u32 {
-    u32::from_be_bytes([b[off], b[off + 1], b[off + 2], b[off + 3]])
-}
-
 /// Read-only AmigaDOS explorer: boot block, root block and root directory.
 pub fn inspect_adf(data: &[u8]) -> Result<AdfInfo, String> {
     if data.len() != 901_120 && data.len() != 1_802_240 {
@@ -78,13 +46,13 @@ pub fn inspect_adf(data: &[u8]) -> Result<AdfInfo, String> {
         _ => "Unknown DOS type",
     }
     .to_string();
-    let boot_checksum_ok = boot_checksum(&data[..1024]) == 0xffff_ffff;
+    let boot_checksum_ok = boot_checksum_ok(data);
     // A valid checksum is what makes Kickstart run the boot code.
     let bootable = boot_checksum_ok && data[12..1024].iter().any(|&b| b != 0);
     let root_block = (data.len() / 512 / 2) as u32;
     let root = &data[root_block as usize * 512..][..512];
     let root_valid = be32(root, 0) == 2 && be32(root, 508) == 1;
-    let root_checksum_ok = root_valid && block_checksum_ok(root);
+    let root_checksum_ok = root_valid && header_checksum_ok(root);
     let volume = bcpl_name(root, 432).unwrap_or_else(|| "<unknown>".into());
 
     // Walk the root hash table (72 entries for 512-byte blocks) and its hash chains.
@@ -124,43 +92,11 @@ pub fn inspect_adf(data: &[u8]) -> Result<AdfInfo, String> {
     })
 }
 
-fn boot_checksum(b: &[u8]) -> u32 {
-    let mut s = 0u32;
-    for c in b.chunks_exact(4) {
-        let (n, carry) = s.overflowing_add(u32::from_be_bytes([c[0], c[1], c[2], c[3]]));
-        s = n.wrapping_add(carry as u32);
-    }
-    s
-}
-
-fn block_checksum_ok(b: &[u8]) -> bool {
-    b.chunks_exact(4).map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]])).fold(0u32, u32::wrapping_add) == 0
-}
-
-fn bcpl_name(block: &[u8], off: usize) -> Option<String> {
-    let n = *block.get(off)? as usize;
-    if n == 0 || n > 30 || off + 1 + n > block.len() {
-        return None;
-    }
-    Some(block[off + 1..off + 1 + n].iter().map(|&c| c as char).collect())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn set32(b: &mut [u8], off: usize, v: u32) {
-        b[off..off + 4].copy_from_slice(&v.to_be_bytes());
-    }
-
-    fn fix_checksum(b: &mut [u8], off: usize) {
-        set32(b, off, 0);
-        let sum = b
-            .chunks_exact(4)
-            .map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]))
-            .fold(0u32, u32::wrapping_add);
-        set32(b, off, 0u32.wrapping_sub(sum));
-    }
+    use crate::fs::amigados::set_header_checksum;
+    use crate::fs::bytes::put_be32 as set32;
 
     #[test]
     fn explores_synthetic_adf() {
@@ -179,7 +115,7 @@ mod tests {
         set32(&mut d, f + 324, 1234);
         d[f + 432] = 6;
         d[f + 433..f + 439].copy_from_slice(b"readme");
-        fix_checksum(&mut d[root..root + 512], 20);
+        set_header_checksum(&mut d[root..root + 512], 20);
         let info = inspect_adf(&d).unwrap();
         assert_eq!(info.filesystem, "FFS");
         assert_eq!(info.volume, "Test");

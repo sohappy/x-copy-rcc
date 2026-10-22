@@ -2,9 +2,9 @@
 
 //! Model of every `gw` action with its options, argument generation and pre-flight validation.
 
-use crate::formats::{self, Catalog};
-use crate::imageopts;
-use crate::trackset::validate_tspec;
+use crate::disk::formats::{self, Catalog};
+use crate::disk::imageopts;
+use crate::disk::trackset::validate_tspec;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::fmt::Display;
@@ -199,7 +199,7 @@ pub struct ReadOpts {
     pub gen_tg43: bool,
     #[serde(skip)]
     pub no_clobber: bool,
-    /// Image file options (`file.hfe::bitrate=250`), see [`crate::imageopts`].
+    /// Image file options (`file.hfe::bitrate=250`), see [`crate::disk::imageopts`].
     pub file_opts: String,
 }
 

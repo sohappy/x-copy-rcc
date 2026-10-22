@@ -5,12 +5,14 @@
 //! after the other, like X-COPY's copy loop. The gw process itself is run, parsed and mapped by
 //! `hgf-core` (runner, parser, disk map).
 
-use crate::amiga::{self, Boot};
 use crate::sound::Sound;
-use hgf_core::diskmap::MapMode;
+use hgf_core::diag::hints;
+use hgf_core::disk::diskmap::MapMode;
+use hgf_core::fs::amigados::{self, Boot};
+use hgf_core::gw::parse::{Output, TrackOutcome};
+use hgf_core::gw::spawn::{JobControl, ProcessSpawner, Spawner};
 use hgf_core::gw::{Action, ActionKind, Drive, GwConfig};
-use hgf_core::parse::{Output, TrackOutcome};
-use hgf_core::{hints, image, runner, DiskMap, JobEvent, OutputParser, TrackSet};
+use hgf_core::{DiskMap, JobEvent, OutputParser, TrackSet};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -24,11 +26,14 @@ pub enum Level {
     Error,
 }
 
+/// Builds the next steps when reached (see [`Task::Expand`]).
+pub type ExpandFn = Box<dyn FnOnce(&mut Engine) -> Result<Vec<Task>, String>>;
+
 /// One step of an operation.
 pub enum Task {
     /// Run gw. `idx` is the DFx number of the drive (for its activity light).
     Gw {
-        action: Action,
+        action: Box<Action>,
         drive: Drive,
         idx: usize,
         label: String,
@@ -60,7 +65,7 @@ pub enum Task {
         message: String,
     },
     /// Steps computed when reached (e.g. BAMCOPY: which tracks to read once the bitmap is known).
-    Expand(Box<dyn FnOnce(&mut Engine) -> Result<Vec<Task>, String>>),
+    Expand(ExpandFn),
     /// Read the volume name of a probe image (cylinder 40) for the DF>ADF file name.
     NameProbe {
         path: PathBuf,
@@ -87,7 +92,7 @@ pub struct Ask {
 }
 
 struct Run {
-    job: runner::Job,
+    job: Box<dyn JobControl>,
     kind: ActionKind,
     label: String,
     failure: Option<String>,
@@ -95,6 +100,8 @@ struct Run {
 
 pub struct Engine {
     pub cfg: GwConfig,
+    /// Starts gw: the real program, or a scripted replay in tests.
+    spawner: Box<dyn Spawner>,
     queue: VecDeque<Task>,
     run: Option<Run>,
     parser: OutputParser,
@@ -123,8 +130,13 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(cfg: GwConfig) -> Self {
+        Self::with_spawner(cfg, Box::new(ProcessSpawner))
+    }
+
+    pub fn with_spawner(cfg: GwConfig, spawner: Box<dyn Spawner>) -> Self {
         Self {
             cfg,
+            spawner,
             queue: VecDeque::new(),
             run: None,
             parser: OutputParser::new(),
@@ -307,7 +319,7 @@ impl Engine {
                     _ => {}
                 }
                 self.parser = OutputParser::new();
-                match runner::spawn(&self.cfg.program, &args) {
+                match self.spawner.spawn(&self.cfg.program, &args) {
                     Ok(job) => {
                         let writes =
                             matches!(kind, ActionKind::Write | ActionKind::Erase | ActionKind::Clean);
@@ -426,7 +438,7 @@ impl Engine {
             },
             Task::NameProbe { path, hd } => {
                 let data = std::fs::read(&path).unwrap_or_default();
-                let name = amiga::volume_name(&data, hd);
+                let name = amigados::volume_name(&data, hd);
                 match &name {
                     Some(n) => self.push_log(format!("Volume name: {n}"), Level::Good),
                     None => self.push_log("No volume name found (NDOS or damaged root block).", Level::Warn),
@@ -441,13 +453,13 @@ impl Engine {
             }
             Task::BootCheck { path, hd } => {
                 let Ok(data) = std::fs::read(&path) else { return };
-                let boot = amiga::classify_boot(&data);
+                let boot = amigados::classify_boot(&data);
                 self.push_log(format!("Boot block: {}", boot.describe()), Level::Info);
                 if boot.is_unusual() {
                     let fix = path.clone();
                     let patch: Task = Task::Expand(Box::new(move |e: &mut Engine| {
                         let mut d = std::fs::read(&fix).map_err(|e| e.to_string())?;
-                        amiga::blank_boot(&mut d, hd);
+                        amigados::blank_boot(&mut d, hd);
                         std::fs::write(&fix, &d).map_err(|e| e.to_string())?;
                         e.push_log("Boot block replaced by a blank one in the image.", Level::Good);
                         Ok(Vec::new())
@@ -467,7 +479,7 @@ impl Engine {
                         notice: false,
                         choice: Some(("REPLACE", "KEEP")),
                     });
-                    self.set_status(format!("BOOT BLOCK: {}", boot.describe()), lvl);
+                    self.set_status(format!("BOOT BLOCK: {}", boot.describe().to_uppercase()), lvl);
                 }
             }
         }
@@ -549,7 +561,7 @@ pub fn dir_lines(path: &std::path::Path) -> Vec<(String, Level)> {
         Ok(d) => d,
         Err(e) => return vec![(format!("Cannot read the image: {e}"), Level::Error)],
     };
-    match image::inspect_adf(&data) {
+    match amigados::inspect_adf(&data) {
         Err(e) => vec![(e, Level::Error), ("Not an AmigaDOS disk (NDOS)?".into(), Level::Warn)],
         Ok(info) => {
             let mut v = vec![
@@ -564,13 +576,13 @@ pub fn dir_lines(path: &std::path::Path) -> Vec<(String, Level)> {
                     if info.root_checksum_ok { Level::Info } else { Level::Error },
                 ),
                 {
-                    let b = amiga::classify_boot(&data);
+                    let b = amigados::classify_boot(&data);
                     let l = match b {
                         Boot::Suspect(_) => Level::Error,
                         Boot::Custom => Level::Warn,
                         _ => Level::Info,
                     };
-                    (format!("BOOT BLOCK: {}", b.describe()), l)
+                    (format!("BOOT BLOCK: {}", b.describe().to_uppercase()), l)
                 },
                 (String::new(), Level::Info),
             ];
@@ -594,11 +606,176 @@ pub fn dir_lines(path: &std::path::Path) -> Vec<(String, Level)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hgf_core::gw::spawn::{Script, ScriptedSpawner};
+    use hgf_core::gw::{ReadOpts, WriteOpts};
+
+    const READ_OK: &str = "Reading c=0-1:h=0-1 revs=3
+Format amiga.amigados
+T0.0: AmigaDOS (11/11 sectors) from Raw Flux (100000 flux in 600.00ms)
+T0.1: AmigaDOS (11/11 sectors) from Raw Flux (100000 flux in 600.00ms)
+T1.0: AmigaDOS (9/11 sectors) from Raw Flux (100000 flux in 600.00ms)
+T1.0: AmigaDOS (11/11 sectors) from Raw Flux (100000 flux in 600.00ms) (Retry #0.1)
+T1.1: AmigaDOS (11/11 sectors) from Raw Flux (100000 flux in 600.00ms)";
+
+    const WRITE_OK: &str = "Format amiga.amigados
+Writing c=0-1:h=0-1
+T0.0: Writing Track (Flux: 200.0ms period, 200.0 ms total, Write all)
+T0.1: Writing Track (Flux: 200.0ms period, 200.0 ms total, Write all)
+T1.0: Writing Track (Flux: 200.0ms period, 200.0 ms total, Write all)
+T1.1: Writing Track (Flux: 200.0ms period, 200.0 ms total, Write all)
+All tracks verified";
+
+    const WRITE_FAIL: &str = "Format amiga.amigados
+Writing c=0-1:h=0-1
+T0.0: Writing Track (Flux: 200.0ms period, 219.9 ms total, Terminate at index)
+T0.1: Writing Track (Verify Failure: Retry #3)
+** FATAL ERROR:
+Failed to verify Track 0.1";
+
+    fn geo() -> TrackSet {
+        TrackSet::dense(2, 2)
+    }
+
+    fn read_task() -> Task {
+        let action = Action::Read(ReadOpts {
+            output: "copy.adf".into(),
+            format: "amiga.amigados".into(),
+            ..Default::default()
+        });
+        Task::Gw {
+            action: Box::new(action),
+            drive: Drive::A,
+            idx: 0,
+            label: "READING DF0".into(),
+            geometry: geo(),
+        }
+    }
+
+    fn write_task() -> Task {
+        let action = Action::Write(WriteOpts {
+            input: "copy.adf".into(),
+            format: "amiga.amigados".into(),
+            ..Default::default()
+        });
+        Task::Gw {
+            action: Box::new(action),
+            drive: Drive::B,
+            idx: 1,
+            label: "WRITING DF1".into(),
+            geometry: geo(),
+        }
+    }
+
+    fn copy_tasks() -> Vec<Task> {
+        vec![
+            Task::Confirm { title: "WARNING!".into(), text: "ALL DATA ON DF1 WILL BE DESTROYED.".into() },
+            read_task(),
+            Task::CheckBad,
+            write_task(),
+            Task::Done { message: "OPERATION DONE.".into() },
+        ]
+    }
+
+    fn engine(scripts: Vec<Script>) -> (Engine, ScriptedSpawner) {
+        let spawner = ScriptedSpawner::new(scripts);
+        let probe = spawner.clone();
+        (Engine::with_spawner(GwConfig::default(), Box::new(spawner)), probe)
+    }
+
+    /// Tick until the engine is idle or waits for the user.
+    fn run(e: &mut Engine) {
+        for _ in 0..10_000 {
+            e.tick();
+            if e.ask.is_some() || !e.busy() {
+                return;
+            }
+        }
+        panic!("engine did not settle");
+    }
+
+    #[test]
+    fn disk_to_disk_copy_reads_then_writes() {
+        let (mut e, gw) = engine(vec![Script::new(READ_OK, 0), Script::new(WRITE_OK, 0)]);
+        e.start(copy_tasks(), GwConfig::default());
+        run(&mut e);
+        assert_eq!(e.ask.as_ref().map(|a| a.title.as_str()), Some("WARNING!"));
+        assert!(gw.calls().is_empty(), "nothing runs before the confirmation");
+        e.answer(true);
+        run(&mut e);
+        assert!(e.ask.is_none());
+        assert!(!e.busy());
+        assert_eq!(e.status, "OPERATION DONE.");
+        assert_eq!(e.done_count, 1);
+        assert_eq!(e.sound, Some(Sound::Done));
+        let calls = gw.calls();
+        assert_eq!(calls.len(), 2);
+        assert!(calls[0].starts_with("gw read --drive A --format amiga.amigados"), "{}", calls[0]);
+        assert!(calls[1].starts_with("gw write --drive B --format amiga.amigados"), "{}", calls[1]);
+        // the map shows the last operation: four tracks written and verified
+        assert_eq!(e.map.counts().ok, 4);
+    }
+
+    #[test]
+    fn verify_failure_stops_with_an_explanation() {
+        let (mut e, _) = engine(vec![Script::new(READ_OK, 0), Script::new(WRITE_FAIL, 1)]);
+        e.start(copy_tasks(), GwConfig::default());
+        run(&mut e);
+        e.answer(true);
+        run(&mut e);
+        let ask = e.ask.clone().expect("failure requester");
+        assert_eq!(ask.title, "OPERATION FAILED");
+        assert!(ask.notice);
+        assert!(ask.lines[0].0.contains("Failed to verify Track 0.1"));
+        assert!(ask.lines.len() > 2, "a plain-language hint follows the error");
+        assert!(e.status.starts_with("ERROR:"));
+        assert_eq!(e.level, Level::Error);
+        assert_eq!(e.done_count, 0);
+        assert_eq!(e.sound, Some(Sound::Error));
+        e.answer(true);
+        assert!(!e.busy());
+    }
+
+    #[test]
+    fn no_at_the_confirmation_runs_nothing() {
+        let (mut e, gw) = engine(vec![Script::new(READ_OK, 0)]);
+        e.start(copy_tasks(), GwConfig::default());
+        run(&mut e);
+        e.answer(false);
+        run(&mut e);
+        assert!(gw.calls().is_empty());
+        assert_eq!(e.status, "OPERATION CANCELLED.");
+        assert!(!e.busy());
+    }
+
+    #[test]
+    fn stop_interrupts_the_running_job() {
+        let (mut e, gw) = engine(vec![Script::new(READ_OK, 0), Script::new(WRITE_OK, 0)]);
+        e.start(vec![read_task(), write_task()], GwConfig::default());
+        e.tick(); // the read starts and its first lines are consumed
+        e.stop();
+        run(&mut e);
+        assert_eq!(e.status, "OPERATION STOPPED.");
+        assert_eq!(gw.calls().len(), 1, "the write never starts");
+        assert_eq!(e.sound, Some(Sound::Abort));
+    }
+
+    #[test]
+    fn expand_inserts_steps_in_place() {
+        let (mut e, gw) = engine(vec![Script::new(READ_OK, 0)]);
+        let tasks = vec![
+            Task::Expand(Box::new(|_| Ok(vec![read_task()]))),
+            Task::Done { message: "OPERATION DONE.".into() },
+        ];
+        e.start(tasks, GwConfig::default());
+        run(&mut e);
+        assert_eq!(gw.calls().len(), 1);
+        assert_eq!(e.status, "OPERATION DONE.");
+    }
 
     #[test]
     fn directory_of_a_blank_disk() {
-        let opts = hgf_core::amigados::FormatOpts { name: "Games".into(), ..Default::default() };
-        let img = hgf_core::amigados::blank_image(&opts).unwrap();
+        let opts = hgf_core::fs::amigados::FormatOpts { name: "Games".into(), ..Default::default() };
+        let img = hgf_core::fs::amigados::blank_image(&opts).unwrap();
         let p = std::env::temp_dir().join("xcopy-test-dir.adf");
         std::fs::write(&p, img).unwrap();
         let lines = dir_lines(&p);

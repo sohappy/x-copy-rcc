@@ -138,7 +138,7 @@ const D88: &[OptSpec] = &[opt("index", &[], "disk number inside a multi-disk D88
 
 /// Options gw accepts for an image file it writes (read destination, convert output).
 pub fn for_output(path: &Path) -> &'static [OptSpec] {
-    match crate::formats::extension(path).as_deref() {
+    match crate::disk::formats::extension(path).as_deref() {
         Some("hfe") => HFE,
         Some("scp") => SCP,
         Some("raw") => KRYOFLUX,
@@ -148,7 +148,7 @@ pub fn for_output(path: &Path) -> &'static [OptSpec] {
 
 /// Options gw accepts for an image file it reads (write source, convert input).
 pub fn for_input(path: &Path) -> &'static [OptSpec] {
-    match crate::formats::extension(path).as_deref() {
+    match crate::disk::formats::extension(path).as_deref() {
         Some("d88") => D88,
         _ => &[],
     }

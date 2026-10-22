@@ -5,7 +5,7 @@
 //! Candidates are checked in order and each one is validated by running `gw --help`
 //! (which prints the list of actions and does not touch the USB device).
 
-use crate::runner;
+use crate::gw::runner;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

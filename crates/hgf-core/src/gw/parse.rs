@@ -5,7 +5,7 @@
 //! Every pattern here comes from the Greaseweazle host tools sources (`tools/*.py`); the
 //! test fixtures in `tests/fixtures` are real captures.
 
-use crate::trackset::TrackSet;
+use crate::disk::trackset::TrackSet;
 use regex::Regex;
 use std::sync::LazyLock;
 

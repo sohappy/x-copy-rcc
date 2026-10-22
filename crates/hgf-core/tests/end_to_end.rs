@@ -1,8 +1,8 @@
 //! Real gw captures run through the parser and the disk map.
 
-use hgf_core::diskmap::{DiskMap, MapMode, TrackState};
-use hgf_core::parse::{Output, OutputParser};
-use hgf_core::trackset::TrackSet;
+use hgf_core::disk::diskmap::{DiskMap, MapMode, TrackState};
+use hgf_core::disk::trackset::TrackSet;
+use hgf_core::gw::parse::{Output, OutputParser};
 
 fn replay(log: &str, mode: MapMode) -> (DiskMap, Vec<Output>) {
     let mut map = DiskMap::new(mode, TrackSet::dense(80, 2));

@@ -4,8 +4,8 @@
 //! (the disk reads back fine in the same drive with the same options, but not on an Amiga)
 //! and images that need a newer Kickstart than the target machine has.
 
+use crate::fs::amigados::AdfInfo;
 use crate::gw::{Densel, WriteOpts};
-use crate::image::AdfInfo;
 
 /// Write precompensation used by the Amiga's trackdisk.device on DD disks.
 pub const AMIGA_PRECOMP: &str = "40=140";
@@ -37,12 +37,12 @@ pub fn is_amiga_write(o: &WriteOpts) -> bool {
     if !o.format.is_empty() {
         return o.format.starts_with("amiga.");
     }
-    crate::formats::extension(&o.input).as_deref() == Some("adf")
+    crate::disk::formats::extension(&o.input).as_deref() == Some("adf")
 }
 
 /// Everything that may make the written disk unreadable on an Amiga.
 ///
-/// `image` is the result of [`crate::image::inspect_adf`] on the source image, if it was read.
+/// `image` is the result of [`crate::fs::amigados::inspect_adf`] on the source image, if it was read.
 pub fn amiga_write_concerns(o: &WriteOpts, image: Option<&Result<AdfInfo, String>>) -> Vec<Concern> {
     let mut out = Vec::new();
     if !is_amiga_write(o) {

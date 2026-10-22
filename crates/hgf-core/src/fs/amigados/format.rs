@@ -6,11 +6,8 @@
 //! (880 / 1760), one bitmap block right after it. Checked against `xdftool … format`
 //! (amitools) in the tests.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
-pub const DD_BLOCKS: usize = 1760;
-pub const HD_BLOCKS: usize = 3520;
-const BSIZE: usize = 512;
+use super::{set_header_checksum, BSIZE, DD_BLOCKS, HD_BLOCKS};
+use crate::fs::bytes::{now_secs, put_be32 as put32};
 
 /// Filesystems that a freshly formatted disk can carry.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -87,20 +84,6 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn put32(b: &mut [u8], off: usize, v: u32) {
-    b[off..off + 4].copy_from_slice(&v.to_be_bytes());
-}
-
-/// Standard header-block checksum: the sum of all longs is zero.
-fn set_checksum(block: &mut [u8], off: usize) {
-    put32(block, off, 0);
-    let sum = block
-        .chunks_exact(4)
-        .map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]))
-        .fold(0u32, u32::wrapping_add);
-    put32(block, off, 0u32.wrapping_sub(sum));
-}
-
 /// AmigaDOS date stamp (days since 1978-01-01, minutes, ticks of 1/50 s) for a Unix time.
 pub fn amiga_date(unix_secs: u64) -> (u32, u32, u32) {
     const EPOCH_DIFF: u64 = 2922 * 86_400; // 1970-01-01 → 1978-01-01
@@ -110,7 +93,7 @@ pub fn amiga_date(unix_secs: u64) -> (u32, u32, u32) {
 
 /// Build a blank, formatted AmigaDOS image.
 pub fn blank_image(opts: &FormatOpts) -> Result<Vec<u8>, String> {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let now = now_secs();
     blank_image_at(opts, now)
 }
 
@@ -144,7 +127,7 @@ pub fn blank_image_at(opts: &FormatOpts, unix_secs: u64) -> Result<Vec<u8>, Stri
             r[433 + i] = c as u32 as u8;
         }
         put32(r, 508, 1); // ST_ROOT
-        set_checksum(r, 20);
+        set_header_checksum(r, 20);
     }
 
     // Bitmap: one bit per block from block 2, 1 = free. Root and bitmap are in use.
@@ -159,7 +142,7 @@ pub fn blank_image_at(opts: &FormatOpts, unix_secs: u64) -> Result<Vec<u8>, Stri
             let v = u32::from_be_bytes([b[off], b[off + 1], b[off + 2], b[off + 3]]) & !(1 << (i % 32));
             put32(b, off, v);
         }
-        set_checksum(b, 0);
+        set_header_checksum(b, 0);
     }
     Ok(img)
 }
@@ -167,11 +150,8 @@ pub fn blank_image_at(opts: &FormatOpts, unix_secs: u64) -> Result<Vec<u8>, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image::inspect_adf;
-
-    fn be32(b: &[u8], off: usize) -> u32 {
-        u32::from_be_bytes([b[off], b[off + 1], b[off + 2], b[off + 3]])
-    }
+    use crate::fs::amigados::inspect_adf;
+    use crate::fs::bytes::be32;
 
     #[test]
     fn matches_xdftool_layout() {

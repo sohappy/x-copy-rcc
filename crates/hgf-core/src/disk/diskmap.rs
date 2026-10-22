@@ -2,8 +2,8 @@
 
 //! Per-track state of the disk being read, written, converted or erased.
 
-use crate::parse::{Output, TrackOutcome};
-use crate::trackset::TrackSet;
+use crate::disk::trackset::TrackSet;
+use crate::gw::parse::{Output, TrackOutcome};
 use std::collections::BTreeMap;
 
 /// Upper bound on the sector numbers accepted from gw's sector map.
@@ -309,7 +309,7 @@ impl DiskMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::OutputParser;
+    use crate::gw::parse::OutputParser;
 
     fn feed(map: &mut DiskMap, lines: &[&str]) {
         let mut p = OutputParser::new();

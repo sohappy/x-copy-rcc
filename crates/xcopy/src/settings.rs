@@ -307,7 +307,7 @@ mod tests {
         let (t, g) = s.tracks();
         assert_eq!(t.spec().as_deref(), Some("c=10-20:h=1"));
         assert_eq!(g.len(), 11);
-        assert!(hgf_core::trackset::validate_tspec(&t.spec().unwrap()).is_ok());
+        assert!(hgf_core::disk::trackset::validate_tspec(&t.spec().unwrap()).is_ok());
     }
 
     #[test]

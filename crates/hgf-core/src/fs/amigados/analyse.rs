@@ -1,53 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 Retro Computing Club (RCC)
 
-//! AmigaDOS analysis of an ADF image: block allocation map (for BAMCOPY), volume name and
-//! boot block classification.
+//! What a copier needs to know about an AmigaDOS disk before (or after) reading it:
+//! which cylinders hold data (allocation bitmap, for BAMCOPY), the volume name, and what kind
+//! of boot block it carries.
 
-/// Bytes per AmigaDOS block.
-const BSIZE: usize = 512;
-
-pub fn total_blocks(hd: bool) -> usize {
-    if hd {
-        3520
-    } else {
-        1760
-    }
-}
-
-pub fn sectors_per_track(hd: bool) -> usize {
-    if hd {
-        22
-    } else {
-        11
-    }
-}
-
-pub fn image_size(hd: bool) -> usize {
-    total_blocks(hd) * BSIZE
-}
-
-fn be32(b: &[u8], off: usize) -> u32 {
-    u32::from_be_bytes([b[off], b[off + 1], b[off + 2], b[off + 3]])
-}
-
-fn block(data: &[u8], n: usize) -> Option<&[u8]> {
-    data.get(n * BSIZE..(n + 1) * BSIZE)
-}
-
-/// Standard header checksum: the sum of all longs of the block is zero.
-fn header_checksum_ok(b: &[u8]) -> bool {
-    b.chunks_exact(4).map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]])).fold(0u32, u32::wrapping_add) == 0
-}
-
-/// Cylinder holding a block (two heads per cylinder).
-pub fn cylinder_of(blk: usize, hd: bool) -> u16 {
-    (blk / sectors_per_track(hd) / 2) as u16
-}
-
-fn root_index(hd: bool) -> usize {
-    total_blocks(hd) / 2
-}
+use super::{
+    bcpl_name, block, boot_checksum_ok, cylinder_of, header_checksum_ok, image_size, root_index, total_blocks,
+};
+use crate::fs::bytes::be32;
 
 /// The root block, if it looks valid.
 fn root(data: &[u8], hd: bool) -> Result<&[u8], String> {
@@ -63,26 +23,13 @@ fn root(data: &[u8], hd: bool) -> Result<&[u8], String> {
 
 /// Volume name stored in the root block.
 pub fn volume_name(data: &[u8], hd: bool) -> Option<String> {
-    let r = root(data, hd).ok()?;
-    let len = (r[432] as usize).min(30);
-    let name: String = r[433..433 + len].iter().map(|&b| b as char).collect();
+    let name = bcpl_name(root(data, hd).ok()?, 432)?;
     (!name.trim().is_empty()).then_some(name)
 }
 
-/// File name made from a volume name (characters forbidden on Windows/macOS replaced).
-pub fn file_stem(name: &str) -> String {
-    let s: String =
-        name.chars().map(|c| if "/\\:*?\"<>|".contains(c) || (c as u32) < 32 { '_' } else { c }).collect();
-    let s = s.trim().trim_matches('.').to_string();
-    if s.is_empty() {
-        "disk".into()
-    } else {
-        s
-    }
-}
-
 /// Cylinders that hold allocated blocks, from the root block and its bitmap. The bitmap blocks
-/// must be on cylinder 40 (where formatting puts them), the only cylinder read beforehand.
+/// must be on the root's cylinder (where formatting puts them): it is the only cylinder a
+/// copier reads beforehand.
 pub fn used_cylinders(data: &[u8], hd: bool) -> Result<Vec<u16>, String> {
     let r = root(data, hd)?;
     if be32(r, 312) != 0xffff_ffff {
@@ -94,18 +41,13 @@ pub fn used_cylinders(data: &[u8], hd: bool) -> Result<Vec<u16>, String> {
     used[0] = true;
     used[1] = true;
     used[root_index(hd)] = true;
-    // bm_pages: 25 pointers from offset 316.
-    let mut bitmap_blocks = Vec::new();
-    for i in 0..25 {
-        let p = be32(r, 316 + i * 4) as usize;
-        if p != 0 {
-            bitmap_blocks.push(p);
-        }
-    }
+    // bm_pages: up to 25 pointers from offset 316.
+    let bitmap_blocks: Vec<usize> =
+        (0..25).map(|i| be32(r, 316 + i * 4) as usize).filter(|&p| p != 0).collect();
     if bitmap_blocks.is_empty() {
         return Err("No bitmap block in the root block.".into());
     }
-    // One bitmap block maps (512 - 4) * 8 = 4064 blocks.
+    // One bitmap block maps (512 - 4) * 8 = 4064 blocks, from block 2; a set bit is a free block.
     for (page, &bb) in bitmap_blocks.iter().enumerate() {
         if bb >= blocks {
             return Err(format!("Bitmap block {bb} is outside the disk."));
@@ -131,23 +73,6 @@ pub fn used_cylinders(data: &[u8], hd: bool) -> Result<Vec<u16>, String> {
     let mut cyls: Vec<u16> = (0..blocks).filter(|&b| used[b]).map(|b| cylinder_of(b, hd)).collect();
     cyls.dedup();
     Ok(cyls)
-}
-
-/// Greaseweazle set notation for a sorted cylinder list: `0,3,5-9,40`.
-pub fn set_notation(cyls: &[u16]) -> String {
-    let mut parts = Vec::new();
-    let mut i = 0;
-    while i < cyls.len() {
-        let start = cyls[i];
-        let mut end = start;
-        while i + 1 < cyls.len() && cyls[i + 1] == end + 1 {
-            i += 1;
-            end = cyls[i];
-        }
-        parts.push(if start == end { start.to_string() } else { format!("{start}-{end}") });
-        i += 1;
-    }
-    parts.join(",")
 }
 
 /// Pad (or create) an ADF to its full size, so that a partial read can be written or opened.
@@ -179,11 +104,11 @@ pub enum Boot {
 impl Boot {
     pub fn describe(&self) -> String {
         match self {
-            Boot::NotDos => "NO DOS BOOT BLOCK (NDOS DISK)".into(),
-            Boot::Blank => "BLANK, NOT BOOTABLE".into(),
-            Boot::Standard => "STANDARD (WORKBENCH INSTALL)".into(),
-            Boot::Custom => "CUSTOM CODE (LOADER OR VIRUS?)".into(),
-            Boot::Suspect(t) => format!("SUSPECT: CONTAINS \"{t}\""),
+            Boot::NotDos => "No DOS boot block (NDOS disk)".into(),
+            Boot::Blank => "Blank, not bootable".into(),
+            Boot::Standard => "Standard (Workbench Install)".into(),
+            Boot::Custom => "Custom code (loader or virus?)".into(),
+            Boot::Suspect(t) => format!("Suspect: contains \"{t}\""),
         }
     }
 
@@ -191,16 +116,6 @@ impl Boot {
     pub fn is_unusual(&self) -> bool {
         matches!(self, Boot::Custom | Boot::Suspect(_))
     }
-}
-
-fn boot_checksum_ok(b: &[u8]) -> bool {
-    let mut sum: u32 = 0;
-    for c in b.chunks_exact(4) {
-        let v = u32::from_be_bytes([c[0], c[1], c[2], c[3]]);
-        let (s, carry) = sum.overflowing_add(v);
-        sum = s + carry as u32;
-    }
-    sum == 0xffff_ffff
 }
 
 /// Texts found in well-known boot block viruses (and in their own messages).
@@ -212,8 +127,7 @@ pub fn classify_boot(data: &[u8]) -> Boot {
         return Boot::NotDos;
     }
     let code = &b[12..];
-    let last = code.iter().rposition(|&x| x != 0);
-    let Some(last) = last else { return Boot::Blank };
+    let Some(last) = code.iter().rposition(|&x| x != 0) else { return Boot::Blank };
     if !boot_checksum_ok(b) {
         // Kickstart only runs boot code with a valid checksum.
         return Boot::Blank;
@@ -246,31 +160,17 @@ pub fn blank_boot(data: &mut [u8], hd: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hgf_core::amigados::{blank_image, FormatOpts};
+    use crate::fs::amigados::{blank_image, set_boot_checksum, set_header_checksum, FormatOpts};
+    use crate::fs::bytes::put_be32;
 
     fn blank(name: &str) -> Vec<u8> {
         blank_image(&FormatOpts { name: name.into(), ..Default::default() }).unwrap()
-    }
-
-    fn put32(b: &mut [u8], off: usize, v: u32) {
-        b[off..off + 4].copy_from_slice(&v.to_be_bytes());
-    }
-
-    fn fix_checksum(b: &mut [u8], off: usize) {
-        put32(b, off, 0);
-        let sum = b
-            .chunks_exact(4)
-            .map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]))
-            .fold(0u32, u32::wrapping_add);
-        put32(b, off, 0u32.wrapping_sub(sum));
     }
 
     #[test]
     fn name_of_blank_disk() {
         assert_eq!(volume_name(&blank("Games 1"), false).as_deref(), Some("Games 1"));
         assert_eq!(volume_name(&vec![0u8; 901_120], false), None);
-        assert_eq!(file_stem("A/B:C?"), "A_B_C_");
-        assert_eq!(file_stem("  "), "disk");
     }
 
     #[test]
@@ -286,36 +186,26 @@ mod tests {
         for blk in [100usize, 1500] {
             let i = blk - 2;
             let off = bm * 512 + 4 + (i / 32) * 4;
-            let v =
-                u32::from_be_bytes([img[off], img[off + 1], img[off + 2], img[off + 3]]) & !(1 << (i % 32));
-            put32(&mut img, off, v);
+            let v = be32(&img, off) & !(1 << (i % 32));
+            put_be32(&mut img, off, v);
         }
-        fix_checksum(&mut img[bm * 512..bm * 512 + 512], 0);
+        set_header_checksum(&mut img[bm * 512..bm * 512 + 512], 0);
         assert_eq!(used_cylinders(&img, false).unwrap(), vec![0, 4, 40, 68]);
-        assert_eq!(set_notation(&[0, 4, 5, 6, 40, 68]), "0,4-6,40,68");
     }
 
     #[test]
     fn invalid_bitmap_is_refused() {
         let mut img = blank("x");
         let r = 880 * 512;
-        put32(&mut img, r + 312, 0);
-        fix_checksum(&mut img[r..r + 512], 20);
+        put_be32(&mut img, r + 312, 0);
+        set_header_checksum(&mut img[r..r + 512], 20);
         assert!(used_cylinders(&img, false).is_err());
     }
 
     fn with_code(code: &[u8]) -> Vec<u8> {
         let mut img = blank("x");
         img[12..12 + code.len()].copy_from_slice(code);
-        // boot checksum (with carry) at offset 4
-        put32(&mut img, 4, 0);
-        let mut sum: u32 = 0;
-        for c in img[..1024].chunks_exact(4) {
-            let v = u32::from_be_bytes([c[0], c[1], c[2], c[3]]);
-            let (s, carry) = sum.overflowing_add(v);
-            sum = s + carry as u32;
-        }
-        put32(&mut img, 4, !sum);
+        set_boot_checksum(&mut img);
         img
     }
 

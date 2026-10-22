@@ -1,112 +1,114 @@
 <p align="center">
-  <img src="packaging/icon-128.png" width="128" alt="Icône X-COPY Modern">
+  <img src="packaging/icon-128.png" width="128" alt="X-COPY Modern icon">
 </p>
 
 <h1 align="center">X-COPY Modern</h1>
 
+<p align="center">🇬🇧 <b>English</b> · 🇫🇷 <a href="README.fr.md">Français</a></p>
+
 <p align="center">
   <b>Retro Computing Club · RCC(A) Edition 1.0</b><br>
-  Copier, formater et écrire des disquettes <b>Amiga</b> avec un <b>Greaseweazle</b>,<br>
-  dans une interface rétro inspirée de X-COPY.
+  Copy, format and write <b>Amiga</b> floppy disks with a <b>Greaseweazle</b>,<br>
+  in a retro interface inspired by X-COPY.
 </p>
 
 <p align="center">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-1.95%2B-orange?logo=rust">
-  <img alt="Plateformes" src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-blue">
-  <img alt="Matériel" src="https://img.shields.io/badge/mat%C3%A9riel-Greaseweazle-green">
+  <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-blue">
+  <img alt="Hardware" src="https://img.shields.io/badge/hardware-Greaseweazle-green">
   <img alt="Amiga" src="https://img.shields.io/badge/Amiga-DD%20880K%20%7C%20HD%201.76M-red">
-  <img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-blue">
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue">
   <a href="https://github.com/sohappy/x-copy-rcc/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sohappy/x-copy-rcc/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" width="900" alt="Écran principal : copie BAMCOPY terminée">
+  <img src="docs/screenshot.png" width="900" alt="Main screen: BAMCOPY finished">
 </p>
 
 ---
 
-## Sommaire
+## Contents
 
-- [Fonctions](#fonctions)
-- [Télécharger](#télécharger)
+- [Features](#features)
+- [Download](#download)
 - [Installation](#installation)
-- [Premiers pas](#premiers-pas)
-- [Utilisation](#utilisation)
-- [Dépannage](#dépannage)
-- [Compiler depuis les sources](#compiler-depuis-les-sources)
-- [Organisation du code](#organisation-du-code)
-- [Crédits](#crédits)
-- [Licence](#licence)
+- [Getting started](#getting-started)
+- [Usage](#usage)
+- [Troubleshooting](#troubleshooting)
+- [Building from source](#building-from-source)
+- [Code layout](#code-layout)
+- [Credits](#credits)
+- [License](#license)
 
-## Fonctions
+## Features
 
-### Section COPY
+### COPY section
 
-| Mode | Effet |
+| Mode | What it does |
 |---|---|
-| `DOSCOPY` | Copie secteur AmigaDOS (ADF), avec écriture vérifiée. |
-| `DOSCOPY+` | Comme DOSCOPY, avec le profil récupération (5 tours, 8 relectures, 2 repositionnements de la tête) pour les disques abîmés. |
-| `BAMCOPY` | Lit d'abord le cylindre 40 (bloc racine et bitmap), puis **seulement les cylindres qui contiennent des fichiers**. Beaucoup plus rapide sur un disque peu rempli. Le disque cible est écrit en entier, les pistes libres vierges. Si le bitmap est invalide, il lit tout le disque. |
-| `NIBBLE` | Copie au niveau du flux magnétique (SCP) : garde les protections anti-copie. |
+| `DOSCOPY` | AmigaDOS sector copy (ADF), with verified writes. |
+| `DOSCOPY+` | Like DOSCOPY, with the recovery profile (5 revolutions, 8 retries, 2 head re-seeks) for damaged disks. |
+| `BAMCOPY` | Reads cylinder 40 first (root block and bitmap), then **only the cylinders that hold files**. Much faster on a sparsely filled disk. The target disk is written in full, free tracks blank. If the bitmap is invalid, the whole disk is read. |
+| `NIBBLE` | Copy at the magnetic flux level (SCP): keeps copy protections. |
 
-**DEVICE** choisit le sens de la copie :
+**DEVICE** sets the copy direction:
 
-| DEVICE | Effet |
+| DEVICE | What it does |
 |---|---|
-| `DF>DF` | Disque vers disque. Si la source et la cible sont le même lecteur, X-COPY demande d'échanger les disquettes. |
-| `DF>ADF` | Disque vers fichier image. Le nom du volume est proposé comme nom de fichier (`Workbench Games.adf`). |
-| `ADF>DF` | Fichier image (`.adf`, `.scp`, `.ipf`, `.hfe`…) vers un ou plusieurs disques. DD ou HD est reconnu à la taille du fichier. |
+| `DF>DF` | Disk to disk. If source and target are the same drive, X-COPY asks you to swap disks. |
+| `DF>ADF` | Disk to image file. The volume name is offered as the file name (`Workbench Games.adf`). |
+| `ADF>DF` | Image file (`.adf`, `.scp`, `.ipf`, `.hfe`…) to one or more disks. DD or HD is detected from the file size. |
 
-### Section TOOLS
+### TOOLS section
 
-| Mode | Effet |
+| Mode | What it does |
 |---|---|
-| `FORMAT` | Disque AmigaDOS vierge (OFS/FFS, DD/HD, nom de volume), écrit et vérifié. Avec DEVICE = `ADF`, enregistre une image vierge. |
-| `QFORMAT` | Formatage rapide : toutes les pistes sont écrites, mais sans relecture de vérification. |
-| `TRACK0` | Efface puis réécrit **uniquement la piste 0** (boot block vierge), avec 8 relectures de vérification. Le reste du disque n'est pas touché ; le disque ne démarre plus mais ses fichiers restent lisibles. |
-| `ERASE` | Efface la plage de pistes choisie. |
-| `SPEEDCHK` | Mesure la vitesse du lecteur source (tr/min et écart à 300). |
-| `CLEAN` | Nettoyage des têtes avec une disquette de nettoyage. |
+| `FORMAT` | Blank AmigaDOS disk (OFS/FFS, DD/HD, volume name), written and verified. With DEVICE = `ADF`, saves a blank image instead. |
+| `QFORMAT` | Quick format: every track is written, but without the verify pass. |
+| `TRACK0` | Erases and rewrites **track 0 only** (blank boot block), with 8 verify retries. The rest of the disk is untouched; the disk no longer boots but its files stay readable. |
+| `ERASE` | Erases the selected track range. |
+| `SPEEDCHK` | Measures the source drive speed (RPM and deviation from 300). |
+| `CLEAN` | Head cleaning with a cleaning disk. |
 
-### Boutons
+### Buttons
 
-| Bouton | Touche | Effet |
+| Button | Key | What it does |
 |---|---|---|
-| **START** | Entrée | Lance l'opération. Une confirmation est demandée avant d'écraser un disque. |
-| **REPEAT** | F2 | Réécrit la dernière image sur de nouvelles disquettes, sans relire la source. Pratique pour une série de copies. |
-| **STOP** | Échap | Interrompt proprement ; le lecteur est libéré. |
-| **DISK INFO** | | Modèle, firmware, port et USB du Greaseweazle. |
-| **DIRECTORY** | | Volume, système de fichiers, état du boot block et liste des fichiers du disque source ou d'un ADF. |
-| **CHECKDISK** | | Lecture rapide de toute la disquette et carte de santé des pistes. |
-| **DEFAULT** | | Remet les options de copie par défaut. |
+| **START** | Enter | Starts the operation. You are asked to confirm before a disk is overwritten. |
+| **REPEAT** | F2 | Writes the last image again to new disks, without reading the source again. Handy for a series of copies. |
+| **STOP** | Esc | Stops cleanly; the drive is released. |
+| **DISK INFO** | | Greaseweazle model, firmware, port and USB link. |
+| **DIRECTORY** | | Volume, filesystem, boot block status and file list of the source disk or of an ADF. |
+| **CHECKDISK** | | Quick read of the whole disk and a health map of its tracks. |
+| **DEFAULT** | | Resets the copy options. |
 
-### Et aussi
+### Also
 
-- **Contrôle du boot block** après chaque lecture en mode secteur : *vierge*, *standard* (Install du
-  Workbench), *code inconnu* (chargeur de jeu, intro de démo… ou virus) ou *suspect* (texte typique de
-  virus : « VIRUS », « LAMER », « BANDIT »…). Pour un boot block inconnu ou suspect, X-COPY propose
-  **REPLACE** (boot block vierge dans l'image) ou **KEEP**. Ce n'est pas un antivirus : il n'y a pas de
-  base de signatures.
-- **Plusieurs lecteurs cibles** à la fois (lampes du bas).
-- **Copie partielle** par plage de cylindres (START / END) et par face (SIDE).
-- **Grilles de pistes en direct**, face haute et face basse ; le survol d'une case détaille ses secteurs.
-- **Explication en clair des erreurs** de `gw` (No Index, échec de vérification…).
-- **Journal complet** des commandes `gw` : cliquez sur la ligne d'état en bas.
-- **Mélodies rétro** de fin, d'abandon et d'erreur, désactivables dans SETUP.
-- Réglages mémorisés entre deux sessions.
+- **Boot block check** after every sector-mode read: *blank*, *standard* (Workbench Install),
+  *unknown code* (game loader, demo intro… or virus) or *suspect* (text typical of viruses:
+  "VIRUS", "LAMER", "BANDIT"…). For an unknown or suspect boot block, X-COPY offers **REPLACE**
+  (blank boot block in the image) or **KEEP**. This is not an antivirus: there is no signature
+  database.
+- **Several target drives** at once (lower lamps).
+- **Partial copy** by cylinder range (START / END) and by side (SIDE).
+- **Live track maps** for the upper and lower sides; hovering a cell shows its sectors.
+- **Plain-language explanations** of `gw` errors (No Index, verify failure…).
+- **Full log** of the `gw` commands: click the status line at the bottom.
+- **Retro jingles** on completion, abort and error; can be turned off in SETUP.
+- Settings are remembered between sessions.
 
-## Télécharger
+## Download
 
-Les exécutables prêts à l'emploi sont sur la page
-**[Releases](https://github.com/sohappy/x-copy-rcc/releases)** :
+Ready-to-run executables are on the
+**[Releases](https://github.com/sohappy/x-copy-rcc/releases)** page:
 
-| Système | Fichier | Lancement |
+| System | File | How to start |
 |---|---|---|
-| Windows 10/11 (x64) | `X-COPY-Modern-…-windows-x86_64.zip` | Dézippez et lancez `X-COPY-Modern.exe`. |
-| macOS 11+ (Apple Silicon et Intel) | `X-COPY-Modern-…-macos-universal.zip` | Dézippez et glissez **X-COPY Modern.app** dans Applications. L'application n'est pas signée : au premier lancement, **clic droit → Ouvrir**. |
-| Linux x86_64 | `X-COPY-Modern-…-linux-x86_64.tar.gz` | Décompressez puis lancez `./install.sh` (installation pour l'utilisateur, avec entrée de menu et icône). |
+| Windows 10/11 (x64) | `X-COPY-Modern-…-windows-x86_64.zip` | Unzip and run `X-COPY-Modern.exe`. |
+| macOS 11+ (Apple Silicon and Intel) | `X-COPY-Modern-…-macos-universal.zip` | Unzip and drag **X-COPY Modern.app** to Applications. The app is not signed: the first time, **right-click → Open**. |
+| Linux x86_64 | `X-COPY-Modern-…-linux-x86_64.tar.gz` | Extract, then run `./install.sh` (per-user install, with menu entry and icon). |
 
-Si macOS refuse toujours d'ouvrir l'application (« endommagée ») :
+If macOS still refuses to open the app ("damaged"):
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/X-COPY Modern.app"
@@ -114,8 +116,8 @@ xattr -dr com.apple.quarantine "/Applications/X-COPY Modern.app"
 
 ## Installation
 
-X-COPY Modern pilote le Greaseweazle à travers les **outils officiels `gw`** de Keir Fraser, qu'il faut
-installer d'abord.
+X-COPY Modern drives the Greaseweazle through Keir Fraser's **official `gw` host tools**, which
+must be installed first.
 
 ### macOS
 
@@ -123,8 +125,8 @@ installer d'abord.
 pip3 install greaseweazle
 ```
 
-pip installe souvent `gw` dans un dossier qui n'est pas dans le PATH, par exemple
-`~/Library/Python/3.9/bin/gw`. X-COPY le trouve tout seul, mais pour l'utiliser aussi dans le Terminal :
+pip often installs `gw` in a folder that is not on the PATH, for example
+`~/Library/Python/3.9/bin/gw`. X-COPY finds it by itself, but to use it in the Terminal too:
 
 ```bash
 echo 'export PATH="$HOME/Library/Python/3.9/bin:$PATH"' >> ~/.zprofile
@@ -132,106 +134,105 @@ source ~/.zprofile
 gw info
 ```
 
-(Remplacez `3.9` par votre version de Python.) Le Greaseweazle apparaît sous la forme `/dev/cu.usbmodem…`.
+(Replace `3.9` with your Python version.) The Greaseweazle shows up as `/dev/cu.usbmodem…`.
 
-Le message `NotOpenSSLWarning` du Python d'Apple est sans conséquence pour les disquettes.
-Pour le faire disparaître : `pip3 install "urllib3<2"`.
+The `NotOpenSSLWarning` printed by Apple's Python is harmless for floppy work.
+To silence it: `pip3 install "urllib3<2"`.
 
 ### Windows
 
-Téléchargez l'archive officielle des outils Greaseweazle et dézippez-la **à côté de
-`xcopy-modern.exe`**, ou dans un dossier `greaseweazle-…` du même répertoire.
+Download the official Greaseweazle tools archive and unzip it **next to `X-COPY-Modern.exe`**,
+or into a `greaseweazle-…` folder in the same directory.
 
 ### Linux
 
 ```bash
 pip install --user greaseweazle
-sudo usermod -aG dialout $USER   # accès USB, puis reconnectez-vous
+sudo usermod -aG dialout $USER   # USB access, then log out and back in
 ```
 
-### Si `gw` n'est pas trouvé
+### If `gw` is not found
 
-Cliquez sur **SETUP** (en haut à droite) et collez le chemin complet de `gw` dans *GW PROGRAM*,
-ou cliquez sur **DETECT**. Vous pouvez aussi lancer le programme avec la variable `XCOPY_GW` :
+Click **SETUP** (top right) and paste the full path of `gw` into *GW PROGRAM*, or click
+**DETECT**. You can also start the program with the `XCOPY_GW` variable:
 
 ```bash
 XCOPY_GW=$(which gw) ./xcopy-modern
 ```
 
-## Premiers pas
+## Getting started
 
-1. Branchez le Greaseweazle **et l'alimentation du lecteur** (connecteur 4 broches : le Greaseweazle
-   n'alimente pas le lecteur).
-2. Lancez X-COPY Modern. En haut à droite, la ligne GREASEWEAZLE doit afficher **GW READY**.
-3. Cliquez sur **DISK INFO**. La ligne passe à **DEVICE OK** et affiche le modèle.
-4. Vérifiez le câblage dans **SETUP → BUS** :
-   - **IBM PC** (par défaut) : lecteurs PC sur nappe torsadée. DF0 = lecteur A (après la torsade),
-     DF1 = lecteur B.
-   - **SHUGART** : lecteurs Amiga d'origine ou nappe droite. DF0 à DF3 = unités 0 à 3.
-5. Insérez une disquette Amiga et cliquez sur **CHECKDISK** : c'est une lecture seule, sans risque.
+1. Connect the Greaseweazle **and the drive's power supply** (4-pin connector: the Greaseweazle
+   does not power the drive).
+2. Start X-COPY Modern. At the top right, the GREASEWEAZLE line should read **GW READY**.
+3. Click **DISK INFO**. The line changes to **DEVICE OK** and shows the model.
+4. Check the wiring in **SETUP → BUS**:
+   - **IBM PC** (default): PC drives on a twisted cable. DF0 = drive A (after the twist),
+     DF1 = drive B.
+   - **SHUGART**: original Amiga drives or a straight cable. DF0 to DF3 = units 0 to 3.
+5. Insert an Amiga disk and click **CHECKDISK**: it only reads, so it is safe.
 
-## Utilisation
+## Usage
 
-**Copier une disquette avec un seul lecteur**
-COPY → `DOSCOPY` (ou `BAMCOPY`), DEVICE `DF>DF`, lampe source DF0 et lampe cible DF0, puis **START**.
-X-COPY lit la source, puis demande d'insérer la disquette cible. **REPEAT** refait une copie de plus.
+**Copy a disk with a single drive**
+COPY → `DOSCOPY` (or `BAMCOPY`), DEVICE `DF>DF`, source lamp DF0 and target lamp DF0, then **START**.
+X-COPY reads the source, then asks you to insert the target disk. **REPEAT** makes one more copy.
 
-**Enregistrer une disquette en ADF**
-DEVICE `DF>ADF`, puis **START**. Le nom du volume est proposé comme nom de fichier.
+**Save a disk as an ADF**
+DEVICE `DF>ADF`, then **START**. The volume name is offered as the file name.
 
-**Écrire un ADF sur une disquette**
-DEVICE `ADF>DF`, choisissez le ou les lecteurs cibles, **START**, puis choisissez le fichier.
+**Write an ADF to a disk**
+DEVICE `ADF>DF`, choose the target drive(s), **START**, then pick the file.
 
-**Formater**
-TOOLS → `FORMAT`, cliquez sur NAME pour le nom du volume, choisissez FS (OFS pour Kickstart 1.x,
-FFS pour 2.0 et plus) et DENS, puis **START**.
+**Format**
+TOOLS → `FORMAT`, click NAME to set the volume name, choose FS (OFS for Kickstart 1.x,
+FFS for 2.0 and later) and DENS, then **START**.
 
-### Lire les grilles de pistes
+### Reading the track maps
 
-| Case | Signification |
+| Cell | Meaning |
 |---|---|
-| `O` vert | Piste lue, ou écrite et vérifiée. |
-| `R` jaune | Récupérée après relectures : surface fatiguée. |
-| `1`…`9` rouge | Piste illisible : nombre de secteurs manquants (`X` = plus de 9). |
-| `?` orange | Relecture en cours. |
-| `U` bleu | Piste vide (non formatée). |
-| `F` cyan | Flux brut capturé (NIBBLE). |
-| Blanc clignotant | Piste en cours. |
-| Case sombre | Piste hors de l'opération (par exemple, non lue en BAMCOPY). |
+| Green `O` | Track read, or written and verified. |
+| Yellow `R` | Recovered after retries: worn surface. |
+| Red `1`…`9` | Unreadable track: number of missing sectors (`X` = more than 9). |
+| Orange `?` | Retry in progress. |
+| Blue `U` | Empty (unformatted) track. |
+| Cyan `F` | Raw flux captured (NIBBLE). |
+| Blinking white | Track in progress. |
+| Dark cell | Track not part of the operation (for example, not read by BAMCOPY). |
 
-Face **haute** = tête 1, face **basse** = tête 0 (convention Amiga).
+**Upper** side = head 1, **lower** side = head 0 (Amiga convention).
 
-### Réglages
+### Controls
 
-- Flèches de START / END : clic = 1 cylindre, clic droit = 10, ou molette.
-- Options avec un point orange : un clic les fait défiler. Un clic droit sur le mode le fait défiler dans l'autre sens.
-- Lampes du haut = lecteur source, lampes du bas = lecteurs cibles (plusieurs possibles).
+- START / END arrows: click = 1 cylinder, right-click = 10, or use the mouse wheel.
+- Options with an orange dot: click to cycle through the values. Right-click on the mode cycles backwards.
+- Upper lamps = source drive, lower lamps = target drives (several allowed).
 
-## Dépannage
+## Troubleshooting
 
-| Message ou symptôme | Cause probable et solution |
+| Message or symptom | Likely cause and fix |
 |---|---|
-| `GW NOT FOUND` | Outils `gw` absents ou hors du PATH : voir [Si `gw` n'est pas trouvé](#si-gw-nest-pas-trouvé). |
-| `GetFluxStatus: No Index` | Le lecteur ne voit pas tourner la disquette. Vérifiez l'alimentation du lecteur, que la disquette est bien enfoncée, le bus (IBM ou Shugart) et le lecteur choisi. Testez chaque position avec `gw rpm --drive A`, `B`, `0`, `1`. |
-| `Failed to verify Track 0.x` sur beaucoup de disquettes | Piste 0 usée (la plus sollicitée sur Amiga), disquette **HD** utilisée en DD (masquez le trou de densité avec un adhésif opaque), ancien formatage (essayez `TRACK0` ou `ERASE` puis FORMAT), ou tête encrassée (`CLEAN`). |
-| Cases rouges après FORMAT + CHECKDISK | Surface abîmée : disquette à écarter. |
-| La LED du lecteur reste allumée | Nappe montée à l'envers. |
+| `GW NOT FOUND` | `gw` tools missing or not on the PATH: see [If `gw` is not found](#if-gw-is-not-found). |
+| `GetFluxStatus: No Index` | The drive does not see the disk turning. Check the drive's power, that the disk is fully inserted, the bus (IBM or Shugart) and the selected drive. Test each position with `gw rpm --drive A`, `B`, `0`, `1`. |
+| `Failed to verify Track 0.x` on many disks | Worn track 0 (the busiest track on an Amiga disk), an **HD** disk used as DD (cover the density hole with opaque tape), an old format getting in the way (try `TRACK0`, or `ERASE` then FORMAT), or dirty heads (`CLEAN`). |
+| Red cells after FORMAT + CHECKDISK | Damaged surface: discard the disk. |
+| The drive LED stays on | Cable plugged in upside down. |
 
-**Savoir si une disquette est HS** : FORMAT (pas QFORMAT), puis CHECKDISK. Tout en `O` vert : bonne.
-Quelques `R` : fatiguée. Des cases rouges : HS sur ces pistes. Testez d'abord une disquette connue
-comme bonne, pour mettre le lecteur hors de cause.
+**Is a disk dead?** FORMAT (not QFORMAT), then CHECKDISK. All green `O`: good. A few `R`: worn.
+Red cells: dead on those tracks. Test a known-good disk first, to rule out the drive.
 
-## Compiler depuis les sources
+## Building from source
 
-Il faut **Rust 1.95 ou plus récent**, installé avec [rustup](https://rustup.rs). Un Rust déjà
-installé se met à jour avec `rustup update`.
+You need **Rust 1.95 or later**, installed with [rustup](https://rustup.rs). An existing Rust
+install is updated with `rustup update`.
 
 ### Windows
 
-1. Installez les **Visual Studio Build Tools** avec la charge de travail
-   « Développement Desktop en C++ » (l'installeur de rustup le propose).
-2. Installez Rust : téléchargez et lancez `rustup-init.exe` depuis [rustup.rs](https://rustup.rs).
-3. Dans PowerShell :
+1. Install the **Visual Studio Build Tools** with the "Desktop development with C++" workload
+   (the rustup installer offers it).
+2. Install Rust: download and run `rustup-init.exe` from [rustup.rs](https://rustup.rs).
+3. In PowerShell:
 
 ```powershell
 git clone https://github.com/sohappy/x-copy-rcc.git
@@ -240,26 +241,26 @@ cargo build --release -p xcopy-modern
 .\target\release\xcopy-modern.exe
 ```
 
-L'icône est intégrée à l'exécutable par `build.rs`.
+The icon is embedded in the executable by `build.rs`.
 
 ### macOS
 
 ```bash
-xcode-select --install                                           # outils Apple (une fois)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust (une fois)
+xcode-select --install                                           # Apple tools (once)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust (once)
 git clone https://github.com/sohappy/x-copy-rcc.git
 cd x-copy-rcc
 cargo build --release -p xcopy-modern
 ./target/release/xcopy-modern
 ```
 
-Pour obtenir une application **X-COPY Modern.app** avec son icône (dans `dist/`) :
+To get an **X-COPY Modern.app** application with its icon (in `dist/`):
 
 ```bash
 bash packaging/package.sh macos
 ```
 
-Version universelle (Apple Silicon + Intel) :
+Universal build (Apple Silicon + Intel):
 
 ```bash
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
@@ -273,7 +274,7 @@ bash packaging/package.sh macos-universal
 
 ### Linux
 
-Bibliothèques système nécessaires à l'interface graphique (Debian / Ubuntu) :
+System libraries needed by the GUI (Debian / Ubuntu):
 
 ```bash
 sudo apt install build-essential pkg-config libxkbcommon-dev libgl1-mesa-dev libwayland-dev \
@@ -285,9 +286,9 @@ cargo build --release -p xcopy-modern
 ./target/release/xcopy-modern
 ```
 
-Fedora : `sudo dnf install gcc pkgconf libxkbcommon-devel mesa-libGL-devel wayland-devel libxcb-devel`.
+Fedora: `sudo dnf install gcc pkgconf libxkbcommon-devel mesa-libGL-devel wayland-devel libxcb-devel`.
 
-Pour installer le programme avec une entrée de menu et son icône :
+To install the program with a menu entry and its icon:
 
 ```bash
 bash packaging/package.sh linux-x86_64
@@ -301,84 +302,101 @@ tar xzf dist/X-COPY-Modern-dev-linux-x86_64.tar.gz
 cargo test --workspace
 ```
 
-### Compilation automatique (GitHub Actions)
+### Automatic builds (GitHub Actions)
 
-* **`ci.yml`** : à chaque push, compile et teste sur Linux, Windows et macOS.
-* **`release.yml`** : à chaque tag `v…`, compile les trois versions (Windows `.zip`, macOS `.app`
-  universelle, Linux `.tar.gz`) et publie une release GitHub :
+* **`ci.yml`**: on every push, builds and tests on Linux, Windows and macOS.
+* **`release.yml`**: on every `v…` tag, builds the three versions (Windows `.zip`, universal macOS
+  `.app`, Linux `.tar.gz`) and publishes a GitHub release:
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Depuis l'onglet **Actions → Release → Run workflow**, les trois versions sont compilées et
-téléchargeables comme artefacts, sans publier de release.
+From the **Actions → Release → Run workflow** tab, the three versions are built and can be
+downloaded as artifacts, without publishing a release.
 
-### Essai sans matériel
+### Trying it without hardware
 
-`tools/fake-gw.py` simule `gw` : un disque Amiga avec 3 pistes abîmées, une écriture avec une
-relecture de vérification, `info`, `rpm`…
+`tools/fake-gw.py` simulates `gw`: an Amiga disk with 3 damaged tracks, a write with one verify
+retry, `info`, `rpm`…
 
 ```bash
 XCOPY_GW=$PWD/tools/fake-gw.py ./target/release/xcopy-modern
 
-# Le « disque » dans le lecteur est cet ADF (pour tester BAMCOPY, DIRECTORY, le boot block…)
-FAKE_ADF=mon_disque.adf XCOPY_GW=$PWD/tools/fake-gw.py ./target/release/xcopy-modern
+# The "disk" in the drive is this ADF (to test BAMCOPY, DIRECTORY, the boot block check…)
+FAKE_ADF=my_disk.adf XCOPY_GW=$PWD/tools/fake-gw.py ./target/release/xcopy-modern
 
-# Simule un échec de vérification à l'écriture
+# Simulates a verify failure while writing
 FAKE_VERIFY_FAIL=1 XCOPY_GW=$PWD/tools/fake-gw.py ./target/release/xcopy-modern
 ```
 
-## Organisation du code
+## Code layout
 
 ```
+Cargo.toml           Workspace: every dependency declared once ([workspace.dependencies])
 crates/
-├── hgf-core/        Moteur Greaseweazle (sans interface, testé)
-│                    commandes gw, exécution avec annulation, analyse de la sortie,
-│                    carte des pistes, images AmigaDOS vierges, explorateur ADF, aides
+├── hgf-core/        Greaseweazle and floppy-disk core (no GUI, unit-tested)
+│   ├── gw/          Talking to gw: commands (Action), runner, Spawner trait, output parser, locate, ports
+│   ├── disk/        Track sets, live disk map, formats and presets, image files, naming
+│   ├── fs/          Filesystems: BlankDisk trait, byte helpers, FAT12, CBM DOS, Acorn DFS, Apple II
+│   │   └── amigados/  checksums and layout, format (blank disks), explore (ADF explorer), analyse (bitmap, boot block)
+│   └── diag/        Drive health, plain-language hints, Amiga write compatibility
 └── xcopy/src/
-    ├── main.rs      Fenêtre (eframe/egui), icône
-    ├── app.rs       Écran X-COPY : disposition, clics, requêteurs, construction des opérations
-    ├── engine.rs    File d'étapes (gw, confirmation, échange de disque, contrôles) sans bloquer l'interface
-    ├── amiga.rs     Analyse AmigaDOS : bitmap (BAMCOPY), nom du volume, boot block
-    ├── gfx.rs       Écran virtuel 1280 × 720 mis à l'échelle, panneaux rivetés, lampes, disquettes, logo
-    ├── font.rs      Police bitmap 8 × 8 rendue en texture, avec dégradé et ombre
-    ├── sound.rs     Mélodies carrées synthétisées en WAV, jouées par le lecteur du système
-    └── settings.rs  Options mémorisées
-packaging/           Icônes (PNG 16 à 512 px, .ico, .icns), package.sh, bundle macOS, installation Linux
-tools/fake-gw.py     Simulateur de gw pour les tests
-.github/workflows/   ci.yml (tests 3 systèmes), release.yml (exécutables et release)
+    ├── main.rs      Window (eframe/egui), icon
+    ├── app/         The X-COPY application
+    │   ├── mod.rs     state, click dispatcher, eframe loop
+    │   ├── ops.rs     operations started by the buttons (copy, format, …) as step lists
+    │   ├── dialogs.rs file dialogs (non-blocking) and requesters
+    │   └── screen.rs  drawing of the screen and requesters
+    ├── engine.rs    Step queue (gw, confirmation, disk swap, checks), testable with a scripted Spawner
+    ├── ui/          Retro rendering: font.rs (8 × 8 bitmap font), gfx.rs (scaled screen, panels, lamps, logo)
+    ├── sound.rs     Square-wave jingles synthesised as WAV, played by the system player
+    └── settings.rs  Saved options
+packaging/           Icons (PNG 16 to 512 px, .ico, .icns), package.sh, macOS bundle, Linux install
+tools/fake-gw.py     gw simulator for testing
+.github/workflows/   ci.yml (fmt + clippy, tests on 3 systems), release.yml (executables and release)
 ```
 
-## Crédits
+Two traits carry the abstractions that are actually shared:
 
-- **[Greaseweazle](https://github.com/keirf/greaseweazle)** et ses outils `gw` : Keir Fraser.
-- **hgf-core** : moteur de HappyGreaseFloppy, repris dans `crates/hgf-core`.
-- **[egui / eframe](https://github.com/emilk/egui)** : interface graphique.
-- **[font8x8](https://crates.io/crates/font8x8)** : glyphes bitmap 8 × 8 (domaine public).
-- **[rfd](https://crates.io/crates/rfd)** : sélecteurs de fichiers natifs.
+* **`fs::BlankDisk`**: every formatter (AmigaDOS, FAT12, CBM, DFS, Apple II) validates its input,
+  names its `gw` format and file extension and builds its image through the same interface.
+* **`gw::spawn::Spawner` / `JobControl`**: the engine starts `gw` through this interface;
+  `ProcessSpawner` runs the real program, `ScriptedSpawner` replays captured output, so the copy
+  logic (confirmation, read, bad tracks, write, failures, stop) is unit-tested without hardware.
 
-L'interface rend hommage à **X-COPY Professional**, le copieur Amiga des années 90. Le logo, les
-graphismes et les sons sont des créations originales. Le logo d'origine, les crédits de ses
-auteurs, la mascotte et le logo Amiga ne sont pas reproduits. X-COPY et Amiga sont des marques de
-leurs propriétaires respectifs. Ce projet n'est affilié ni à eux ni au projet Greaseweazle.
+Closed sets of cases (gw actions, engine steps, track states) are Rust `enum`s with exhaustive
+`match`: adding a case does not compile until every place handles it.
 
-## Licence
+## Credits
+
+- **[Greaseweazle](https://github.com/keirf/greaseweazle)** and its `gw` tools: Keir Fraser.
+- **hgf-core**: the HappyGreaseFloppy engine, included in `crates/hgf-core`.
+- **[egui / eframe](https://github.com/emilk/egui)**: GUI.
+- **[font8x8](https://crates.io/crates/font8x8)**: 8 × 8 bitmap glyphs (public domain).
+- **[rfd](https://crates.io/crates/rfd)**: native file dialogs.
+
+The interface pays tribute to **X-COPY Professional**, the 1990s Amiga disk copier. The logo,
+graphics and sounds are original creations. The original logo, its authors' credits, the mascot
+and the Amiga logo are not reproduced. X-COPY and Amiga are trademarks of their respective owners.
+This project is affiliated neither with them nor with the Greaseweazle project.
+
+## License
 
 Copyright © 2026 Retro Computing Club (RCC).
 
-X-COPY Modern est un logiciel libre : vous pouvez le redistribuer et le modifier selon les termes de
-la **GNU General Public License version 3**, ou (à votre choix) de toute version ultérieure, telle que
-publiée par la Free Software Foundation (`GPL-3.0-or-later`).
+X-COPY Modern is free software: you can redistribute it and/or modify it under the terms of the
+**GNU General Public License version 3**, or (at your option) any later version, as published by
+the Free Software Foundation (`GPL-3.0-or-later`).
 
-Ce programme est distribué dans l'espoir qu'il sera utile, mais **sans aucune garantie** ; pas même
-la garantie implicite de qualité marchande ou d'adéquation à un usage particulier. Le texte complet
-est dans le fichier [`LICENSE`](LICENSE).
+This program is distributed in the hope that it will be useful, but **without any warranty**;
+without even the implied warranty of merchantability or fitness for a particular purpose. The full
+text is in the [`LICENSE`](LICENSE) file.
 
-Les bibliothèques utilisées restent sous leurs propres licences, toutes compatibles avec la GPL-3.0
-(MIT, Apache-2.0, Zlib, BSD, ISC) ; les glyphes `font8x8` sont dans le domaine public. Les outils
-Greaseweazle (`gw`) sont un programme séparé, appelé par X-COPY Modern et non inclus.
+The libraries used keep their own licenses, all compatible with GPL-3.0 (MIT, Apache-2.0, Zlib,
+BSD, ISC); the `font8x8` glyphs are public domain. The Greaseweazle tools (`gw`) are a separate
+program, called by X-COPY Modern and not included.
 
-> ⚠️ L'écriture, le formatage et l'effacement **détruisent** le contenu des disquettes cibles.
-> Faites une image ADF de vos disquettes précieuses avant toute manipulation.
+> ⚠️ Writing, formatting and erasing **destroy** the contents of the target disks.
+> Make an ADF image of your precious disks before doing anything with them.

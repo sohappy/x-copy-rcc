@@ -10,7 +10,7 @@ use eframe::egui::{
     TextureOptions, Vec2,
 };
 
-use crate::font::{Font, Style};
+use crate::ui::font::{Font, Style};
 
 pub const W: f32 = 1280.0;
 pub const H: f32 = 720.0;
@@ -63,6 +63,15 @@ impl Canvas {
     pub fn inv(&self, p: Pos2) -> Pos2 {
         ((p - self.o) / self.s).to_pos2()
     }
+}
+
+/// Look of a push button.
+#[derive(Clone, Copy)]
+pub struct Button<'a> {
+    pub label: &'a str,
+    pub color: Color32,
+    pub hover: bool,
+    pub pressed: bool,
 }
 
 /// Painter + canvas + font, passed around by the UI code.
@@ -185,17 +194,8 @@ impl Gfx<'_> {
     }
 
     /// Bevelled push button. `pressed` swaps the light and dark edges.
-    pub fn button(
-        &self,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        label: &str,
-        color: Color32,
-        hover: bool,
-        pressed: bool,
-    ) {
+    pub fn button(&self, x: f32, y: f32, w: f32, h: f32, b: &Button) {
+        let Button { label, color, hover, pressed } = *b;
         let (hi, lo) = if pressed {
             (Color32::from_rgb(10, 16, 24), Color32::from_rgb(150, 190, 210))
         } else {
@@ -332,7 +332,7 @@ pub fn logo(g: &Gfx, x: f32, y: f32, text: &str, brick: f32) {
     let shine = ((g.t * 0.35) % 1.6) as f32 - 0.3;
     let total = text.chars().count() as f32 * 9.0 * brick;
     for (i, ch) in text.chars().enumerate() {
-        let gl = crate::font::glyph(ch);
+        let gl = crate::ui::font::glyph(ch);
         for (row, bits) in gl.iter().enumerate() {
             // emboldened: every pixel also lights its right neighbour
             let bits = *bits as u16 | ((*bits as u16) << 1);

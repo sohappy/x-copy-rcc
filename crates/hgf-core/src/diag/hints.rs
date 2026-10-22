@@ -5,8 +5,8 @@
 //! The matched texts are those of the Greaseweazle host tools (`usb.py` `Ack.str`, `tools/util.py`,
 //! `tools/write.py`) and of the errors seen on real hardware.
 
+use crate::diag::health::ScanStats;
 use crate::gw::ActionKind;
-use crate::health::ScanStats;
 
 /// A button offered next to the hint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -91,6 +91,11 @@ fn parse_num(s: &str, set: &str) -> Result<u16, String> {
     s.trim().parse::<u16>().map_err(|_| format!("'{s}' is not a number in set '{set}'"))
 }
 
+/// Greaseweazle SET notation of a sorted cylinder list: `0,3,5-9,40`.
+pub fn set_notation(cyls: &[u16]) -> String {
+    range_str(&cyls.iter().map(|&c| c as u32).collect::<Vec<_>>())
+}
+
 fn range_str(v: &[u32]) -> String {
     let mut parts = Vec::new();
     let mut i = 0;

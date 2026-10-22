@@ -6,7 +6,7 @@
 //! the BIOS parameter block, two empty FATs and an empty root directory holding the volume label.
 //! Checked with fsck.fat, mtools and pyfatfs in the tests.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::fs::bytes::{now_secs, put_le16 as put16, put_le32 as put32};
 
 const BPS: usize = 512;
 
@@ -301,14 +301,6 @@ fn pc_boot_code(sector: &mut [u8]) {
     sector[0x60..0x60 + msg.len()].copy_from_slice(msg);
 }
 
-fn put16(b: &mut [u8], off: usize, v: u16) {
-    b[off..off + 2].copy_from_slice(&v.to_le_bytes());
-}
-
-fn put32(b: &mut [u8], off: usize, v: u32) {
-    b[off..off + 4].copy_from_slice(&v.to_le_bytes());
-}
-
 /// Upper-cased label padded to 11 bytes ("NO NAME" when empty, as DOS does in the boot sector).
 fn label_bytes(label: &str, empty: &str) -> [u8; 11] {
     let mut out = [b' '; 11];
@@ -414,7 +406,7 @@ pub fn blank_image_at(o: &FatOpts, now: u64) -> Result<Vec<u8>, String> {
 }
 
 pub fn blank_image(o: &FatOpts) -> Result<Vec<u8>, String> {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let now = now_secs();
     blank_image_at(o, now)
 }
 

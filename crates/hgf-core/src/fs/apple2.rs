@@ -131,7 +131,7 @@ fn dos33(volume: u8) -> Vec<u8> {
 
 /// ProDOS date and time words of `secs` since the Unix epoch (UTC).
 fn prodos_datetime(secs: u64) -> [u8; 4] {
-    let (y, mo, d, h, mi, _) = crate::fat12::utc(secs);
+    let (y, mo, d, h, mi, _) = crate::fs::fat12::utc(secs);
     let date: u16 = (((y.rem_euclid(100)) as u16) << 9) | ((mo as u16) << 5) | d as u16;
     let [d0, d1] = date.to_le_bytes();
     [d0, d1, mi as u8, h as u8]

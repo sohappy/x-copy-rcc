@@ -51,9 +51,29 @@ impl Numbering {
     }
 }
 
+/// File name made from a disk or volume name: characters forbidden on Windows or macOS
+/// become `_`; an empty result becomes `disk`.
+pub fn safe_file_stem(name: &str) -> String {
+    let s: String =
+        name.chars().map(|c| if "/\\:*?\"<>|".contains(c) || (c as u32) < 32 { '_' } else { c }).collect();
+    let s = s.trim().trim_matches('.').to_string();
+    if s.is_empty() {
+        "disk".into()
+    } else {
+        s
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn safe_stems() {
+        assert_eq!(safe_file_stem("A/B:C?"), "A_B_C_");
+        assert_eq!(safe_file_stem("  "), "disk");
+        assert_eq!(safe_file_stem("Workbench 1.3"), "Workbench 1.3");
+    }
 
     #[test]
     fn numbered_names() {
